@@ -9,7 +9,6 @@ edition = "2018"
 [dependencies]
 
 
-
 [dev-dependencies]
 criterion = "0.3"
 rand = "0.7"
