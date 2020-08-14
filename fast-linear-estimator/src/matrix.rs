@@ -8,9 +8,9 @@ use std::mem::transmute;
 const SINGLES_PER_AVX: usize = 8;
 
 // matrix of f32, but we split the supplied rows into
-// columns of instrinsics of 8 floats each, and then
+// columns of AVX instrinsics (8 x 32-bit floats), and then
 // do a column-wise multiplication
-pub struct MatrixAvxF32ColumnSets {
+pub struct MatrixAvxF32 {
     pub num_columns: usize,
     pub num_col_instrinsics: usize,
     pub num_rows: usize,
@@ -18,7 +18,7 @@ pub struct MatrixAvxF32ColumnSets {
     intercept_intrinsics: Vec<__m256>,
 }
 
-impl MatrixAvxF32ColumnSets {
+impl MatrixAvxF32 {
     pub fn create_from_rows(rows: &Vec<Vec<f32>>, intercepts: &[f32]) -> Option<Self> {
         let num_columns = rows.first()?.len();
         if num_columns != intercepts.len() {
@@ -65,34 +65,6 @@ impl MatrixAvxF32ColumnSets {
         Some(mat)
     }
 
-    pub fn product_to_avx(&self, values: &[f32], destination: &mut [__m256]) -> Option<()> {
-        if destination.len() != self.num_col_instrinsics || values.len() != self.num_rows {
-            return None;
-        }
-
-        destination
-            .iter_mut()
-            .zip(self.column_intrinsics.iter())
-            .zip(self.intercept_intrinsics.iter())
-            .for_each(|((dst, col), intercepts)| {
-                // run multiplication and add to `accumulate`
-                //let mut accumulate = unsafe { _mm256_setzero_ps() };
-                let mut accumulate = *intercepts;
-                for (val, row_intrin) in values.iter().zip(col) {
-                    unsafe {
-                        // broadcast value (since we already have a reference)
-                        let val_broad = _mm256_broadcast_ss(val);
-                        let mult = _mm256_mul_ps(val_broad, *row_intrin);
-                        accumulate = _mm256_add_ps(accumulate, mult);
-                    }
-                }
-                // copy to destination
-                *dst = accumulate;
-            });
-
-        Some(())
-    }
-
     pub fn product(&self, values: &[f32], destination: &mut [f32]) -> Option<()> {
         if destination.len() != self.num_columns || values.len() != self.num_rows {
             return None;
@@ -104,7 +76,6 @@ impl MatrixAvxF32ColumnSets {
             .zip(self.intercept_intrinsics.iter())
             .for_each(|((dst, col), intercepts)| {
                 // run multiplication and add to `accumulate`
-                //let mut accumulate = unsafe { _mm256_setzero_ps() };
                 let mut accumulate = *intercepts;
                 for (val, row_intrin) in values.iter().zip(col) {
                     unsafe {
@@ -118,7 +89,6 @@ impl MatrixAvxF32ColumnSets {
                 // have a shorter final slice
                 let src = unsafe { transmute::<&__m256, &[f32; 8]>(&accumulate) };
                 dst.copy_from_slice(&src[0..(dst.len())]);
-                //dst.iter_mut().zip(src).for_each(|(d,s)| *d = *s); -- copy from slice is faster.
             });
 
         Some(())
@@ -141,7 +111,6 @@ impl MatrixAvxF32ColumnSets {
             .zip(self.intercept_intrinsics.iter())
             .for_each(|((dst, col), intercepts)| {
                 // run multiplication and add to `accumulate`
-                //let mut accumulate = unsafe { _mm256_setzero_ps() };
                 let mut accumulate = *intercepts;
                 for (val, row_intrin) in values.iter().zip(col) {
                     unsafe {
@@ -163,48 +132,7 @@ impl MatrixAvxF32ColumnSets {
                     // and store using mask
                     let ptr_dest: *mut f32 = transmute(dst.as_mut_ptr());
                     _mm256_maskstore_ps(ptr_dest, mask, accumulate);
-                    //println!("dest: {:?}, src: {:?}", dst, accumulate);
                 }
-            });
-
-        Some(())
-    }
-
-    pub fn product_softmax_cumulative_normal_exp(
-        &self,
-        values: &[f32],
-        destination: &mut [f32],
-    ) -> Option<()> {
-        if destination.len() != self.num_columns || values.len() != self.num_rows {
-            return None;
-        }
-
-        let mut cumulative_sum = 0f32;
-
-        destination
-            .chunks_mut(SINGLES_PER_AVX)
-            .zip(self.column_intrinsics.iter())
-            .zip(self.intercept_intrinsics.iter())
-            .for_each(|((dst, col), intercepts)| {
-                // run multiplication and add to `accumulate`
-                //let mut accumulate = unsafe { _mm256_setzero_ps() };
-                let mut accumulate = *intercepts;
-                for (val, row_intrin) in values.iter().zip(col) {
-                    unsafe {
-                        // broadcast value (since we already have a reference)
-                        let val_broad = _mm256_broadcast_ss(val);
-                        let mult = _mm256_mul_ps(val_broad, *row_intrin);
-                        accumulate = _mm256_add_ps(accumulate, mult);
-                    }
-                }
-                // copy to destination (taking into account final shorter stub)
-                // and apply cumulative softmax
-                let src = unsafe { transmute::<&__m256, &[f32; 8]>(&accumulate) };
-                dst.iter_mut().zip(src).for_each(|(d, s)| {
-                    let vexp = s.exp();
-                    cumulative_sum += vexp;
-                    *d = cumulative_sum;
-                });
             });
 
         Some(())
@@ -226,8 +154,7 @@ impl MatrixAvxF32ColumnSets {
             .zip(self.column_intrinsics.iter())
             .zip(self.intercept_intrinsics.iter())
             .for_each(|((dst, col), intercepts)| {
-                // run multiplication and add to `accumulate`
-                //let mut accumulate = unsafe { _mm256_setzero_ps() };
+                // run multiplication and add to `accumulate`, starting with the intercepts
                 let mut accumulate = *intercepts;
                 for (val, row_intrin) in values.iter().zip(col) {
                     unsafe {
@@ -237,10 +164,11 @@ impl MatrixAvxF32ColumnSets {
                         accumulate = _mm256_add_ps(accumulate, mult);
                     }
                 }
+
                 // copy to destination (taking into account final shorter stub) and apply cumulative softmax
-                // approx exponential:
-                accumulate = exp_approx::inavec_exp_approx_avxf32(accumulate);
-                // cumulative and copy
+                // 1. approximate exponential
+                accumulate = exp_approx::exp_approx_avxf32(accumulate);
+                // 2. accumulate and copy
                 let src = unsafe { transmute::<&__m256, &[f32; 8]>(&accumulate) };
                 dst.iter_mut().zip(src).for_each(|(d, s)| {
                     cumulative_sum += s;
@@ -249,15 +177,6 @@ impl MatrixAvxF32ColumnSets {
             });
 
         Some(())
-    }
-
-    pub fn softmax_f32_in_place_cumulative(values: &mut [f32]) {
-        let mut sum = 0f32;
-        values.iter_mut().for_each(|v| {
-            let vexp = v.exp();
-            sum += vexp;
-            *v = sum;
-        })
     }
 }
 
@@ -289,7 +208,7 @@ mod tests {
     fn product() {
         let rows = vec![vec![1.0f32, 2.0, 3.0], vec![4.0f32, 5.0, 6.0]];
         let intercepts = [10f32, 20f32, 30f32];
-        let matrix = super::MatrixAvxF32ColumnSets::create_from_rows(&rows, &intercepts).unwrap();
+        let matrix = super::MatrixAvxF32::create_from_rows(&rows, &intercepts).unwrap();
         let v = vec![1f32, 2.];
         let mut res = vec![0f32; 3];
         matrix.product(&v, &mut res);
@@ -302,7 +221,7 @@ mod tests {
         let rows: Vec<Vec<f32>> = coeffs[..].chunks(35).map(|c| c.to_vec()).collect();
         let intercepts = [0f32; 35]; // leave these zero; another test covers this
 
-        let matrix = super::MatrixAvxF32ColumnSets::create_from_rows(&rows, &intercepts).unwrap();
+        let matrix = super::MatrixAvxF32::create_from_rows(&rows, &intercepts).unwrap();
         let v: Vec<f32> = (1..=5).map(|x| x as f32).collect();
 
         // output to f32

@@ -23,7 +23,7 @@ mod exp_f32_const {
 }
 
 #[allow(dead_code)]
-pub fn inavec_exp_approx_f32(x_in: f32) -> f32 {
+pub fn exp_approx_f32(x_in: f32) -> f32 {
     // clamp x
     let mut x = x_in;
     x = x.min(exp_f32_const::EXP_HI);
@@ -48,7 +48,7 @@ pub fn inavec_exp_approx_f32(x_in: f32) -> f32 {
 }
 
 #[allow(dead_code)]
-pub fn inavec_exp_approx_avxf32(x_in: __m256) -> __m256 {
+pub fn exp_approx_avxf32(x_in: __m256) -> __m256 {
     let mut x = x_in;
     unsafe {
         // clamp x
@@ -106,7 +106,7 @@ mod tests {
     fn inavec_exp_approx_f32() {
         let res: Vec<_> = VALS
             .iter()
-            .map(|&v| super::inavec_exp_approx_f32(v))
+            .map(|&v| super::exp_approx_f32(v))
             .collect();
         check_assert(&res);
     }
@@ -114,7 +114,7 @@ mod tests {
     #[test]
     fn inavec_exp_approx_avxf32() {
         let input: __m256 = unsafe { _mm256_loadu_ps(&VALS[0]) };
-        let res = super::inavec_exp_approx_avxf32(input);
+        let res = super::exp_approx_avxf32(input);
 
         let res_f32 = crate::common::m256_f32_to_vec(&[res]);
         check_assert(&res_f32);
