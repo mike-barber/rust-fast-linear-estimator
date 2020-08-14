@@ -1,5 +1,5 @@
-use core::arch::x86_64::{ __m256, _mm256_setzero_ps };
-use std::{ mem::transmute_copy, slice };
+use core::arch::x86_64::{__m256, _mm256_setzero_ps};
+use std::{mem::transmute_copy, slice};
 
 // return zero avx single
 #[allow(dead_code)]
