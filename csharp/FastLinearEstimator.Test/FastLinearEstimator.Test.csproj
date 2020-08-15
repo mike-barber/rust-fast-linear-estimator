@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
+    <PackageReference Include="xunit" Version="2.4.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.0" />
+    <PackageReference Include="coverlet.collector" Version="1.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FastLinearEstimator\FastLinearEstimator.csproj" />
+  </ItemGroup>
+
+  
+  <!-- TODO: include the below files in the above project; needs packaging -->
+  
+  <!-- Copy Rust library from target directory -->
+  <!-- $(SolutionDir) is not defined on the command line doing dotnet build in the project, so we just use relative path here -->
+  <ItemGroup Condition="'$(Configuration)'=='Debug'">
+    <RustLibraryFiles Include="..\..\target\debug\*fast_linear_estimator_interop*" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Configuration)'=='Release'">
+    <RustLibraryFiles Include="..\..\target\release\*fast_linear_estimator_interop*" />
+  </ItemGroup>
+
+  <!-- BeforeTargets won't run unless you give it BeforeTargets or AfterTargets -->
+  <Target Name="CopyFiles" BeforeTargets="PreBuildEvent">
+    <Message Text="Source files are: @(RustLibraryFiles) "/>
+    <Copy SourceFiles="@(RustLibraryFiles)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="false" />
+  </Target>
+
+</Project>
