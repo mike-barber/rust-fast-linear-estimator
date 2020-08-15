@@ -1,5 +1,5 @@
 #[no_mangle]
-pub extern "C" fn add(a: i32, b: i32) -> i32 {
+pub extern "C" fn test_add(a: i32, b: i32) -> i32 {
     a + b
 }
 
@@ -10,7 +10,7 @@ mod avx_f32 {
     // coefficients: columns correspond to outputs; rows correspond to inputs;
     // ordering is COLUMN major (i.e. linear in column, stride for rows)
     #[no_mangle]
-    pub extern "C" fn create_avx_f32_matrix_column_major(
+    pub extern "C" fn matrix_f32_create(
         num_inputs: usize,
         num_outputs: usize,
         coefficients: *const f32,
@@ -28,25 +28,28 @@ mod avx_f32 {
         }
     }
 
+    // clean up matrix
     #[no_mangle]
-    pub extern "C" fn product_avx_f32_matrix_column_major(
+    pub unsafe extern "C" fn matrix_avx_f32_delete(matrix: *mut MatrixAvxF32) {
+        if !matrix.is_null() {
+            drop(Box::from_raw(matrix));
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn matrix_f32_product(
         matrix: *mut MatrixAvxF32,
         values: *const f32,
         values_length: usize,
         results: *mut f32,
         results_length: usize,
     ) -> bool {
+        // check for nulls
+        if matrix.is_null() || values.is_null() || results.is_null() {
+            return false;
+        }
         // get reference to the matrix, but don't take ownership of it
-        if matrix.is_null() {
-            return false;
-        }
         let mat = unsafe { Box::leak(Box::from_raw(matrix)) };
-
-        // check input and result pointers
-        if values.is_null() || results.is_null() {
-            return false;
-        }
-
         // get slices for inputs and outputs
         let vals = unsafe { slice::from_raw_parts(values, values_length) };
         let res = unsafe { slice::from_raw_parts_mut(results, results_length) };
@@ -59,17 +62,36 @@ mod avx_f32 {
         }
     }
 
-    // clean up matrix
     #[no_mangle]
-    pub unsafe extern "C" fn destroy_avx_f32_matrix_column_major(matrix: *mut MatrixAvxF32) {
-        if !matrix.is_null() {
-            drop(Box::from_raw(matrix));
+    pub extern "C" fn matrix_f32_softmax_cumulative(
+        matrix: *mut MatrixAvxF32,
+        values: *const f32,
+        values_length: usize,
+        results: *mut f32,
+        results_length: usize,
+    ) -> bool {
+        // check for nulls
+        if matrix.is_null() || values.is_null() || results.is_null() {
+            return false;
+        }
+        // get reference to the matrix, but don't take ownership of it
+        let mat = unsafe { Box::leak(Box::from_raw(matrix)) };
+        // get slices for inputs and outputs
+        let vals = unsafe { slice::from_raw_parts(values, values_length) };
+        let res = unsafe { slice::from_raw_parts_mut(results, results_length) };
+
+        // perform multiplication
+        if let Some(()) = mat.product_softmax_cumulative_approx(vals, res) {
+            true
+        } else {
+            false
         }
     }
+   
 
     #[cfg(test)]
     mod tests {
-        
+
         // Testing native call interface, including safety after disposal
 
         #[test]
@@ -80,13 +102,10 @@ mod avx_f32 {
             let mut results = [0_f32; 3];
 
             let mut matrix =
-                super::create_avx_f32_matrix_column_major(2, 3, 
-                    coefficients[0].as_ptr(),
-                    intercepts.as_ptr()
-                );
+                super::matrix_f32_create(2, 3, coefficients[0].as_ptr(), intercepts.as_ptr());
 
             // test using f32 result
-            assert!(super::product_avx_f32_matrix_column_major(
+            assert!(super::matrix_f32_product(
                 matrix,
                 inputs.as_ptr(),
                 2,
@@ -100,7 +119,7 @@ mod avx_f32 {
             results[0] = 1000.0;
             results[1] = 1000.0;
             results[2] = 1000.0;
-            assert!(super::product_avx_f32_matrix_column_major(
+            assert!(super::matrix_f32_product(
                 matrix,
                 inputs.as_ptr(),
                 2,
@@ -110,7 +129,7 @@ mod avx_f32 {
             assert_eq!(results, [109_f32, 212_f32, 315_f32]);
 
             // wrong input size
-            assert!(!super::product_avx_f32_matrix_column_major(
+            assert!(!super::matrix_f32_product(
                 matrix,
                 inputs.as_ptr(),
                 1, // wrong
@@ -119,52 +138,52 @@ mod avx_f32 {
             ));
 
             // wrong result size
-            assert!(!super::product_avx_f32_matrix_column_major(
+            assert!(!super::matrix_f32_product(
                 matrix,
                 inputs.as_ptr(),
-                2, 
+                2,
                 results.as_mut_ptr(),
                 1 // wrong
             ));
 
             // null input
-            assert!(!super::product_avx_f32_matrix_column_major(
+            assert!(!super::matrix_f32_product(
                 matrix,
                 std::ptr::null(),
-                2, 
+                2,
                 results.as_mut_ptr(),
-                3 
+                3
             ));
 
             // null result
-            assert!(!super::product_avx_f32_matrix_column_major(
+            assert!(!super::matrix_f32_product(
                 matrix,
                 inputs.as_ptr(),
-                2, 
+                2,
                 std::ptr::null_mut(),
-                3 
+                3
             ));
 
             // now destroy the matrix -- do this only once (caller's responsibility)
-            unsafe { super::destroy_avx_f32_matrix_column_major(matrix) };
+            unsafe { super::matrix_avx_f32_delete(matrix) };
             matrix = std::ptr::null_mut();
 
             // and finally attempting to use it should fail with false (not panic)
-            assert!(!super::product_avx_f32_matrix_column_major(
+            assert!(!super::matrix_f32_product(
                 matrix,
                 inputs.as_ptr(),
                 2,
                 results.as_mut_ptr(),
                 3
             ));
-            assert!(!super::product_avx_f32_matrix_column_major(
+            assert!(!super::matrix_f32_product(
                 matrix,
                 inputs.as_ptr(),
                 2,
                 results.as_mut_ptr(),
                 3
             ));
-            assert!(!super::product_avx_f32_matrix_column_major(
+            assert!(!super::matrix_f32_product(
                 matrix,
                 inputs.as_ptr(),
                 2,
