@@ -10,8 +10,8 @@ This is more of a proof of concept than an actual library. However, it does work
     - direct multiplication using iterators
     - a normal library appropriate for this, like `ndarray`
 - work out a fast, relatively low accuracy way to approximate an exponential function
-    - this is is required for the **softmax** part of the logistic estimation
-    - normal `exp` has way more accuracy than required for inference tasks, and is generally quite slow
+    - this is is required for the [softmax](https://en.wikipedia.org/wiki/Softmax_function) part of the logistic estimation
+    - normal `exp` has way more accuracy than required for inference tasks, and is generally quite slow; implementations vary. 
     - approximate implementation using avx2 intrinsics is really fast
     - in the interests of performance over accuracy, I'm using a 4th order interpolation; refer to the resources below for the sources.
 
@@ -40,11 +40,12 @@ It'll be interesting to keep an eye on Rust SIMD in general, particularly the [p
 
 I didn't make up my own exponential approximation algorithm. There are several algorithms out there for fast exponential approximation, including some SSE and AVX ones. The resources that were particularly useful are noted here. The exponential approximation used in this code is a synthesis of the approaches noted below, and most of the credit is due to those authors:
 
-- math_avxfun attribution: http://software-lisc.fbk.eu/avx_mathfun/avx_mathfun.h
-- inavec attribution: https://gitlab.mpcdf.mpg.de/bbramas/inastemp 
+- math_avxfun: http://software-lisc.fbk.eu/avx_mathfun/avx_mathfun.h
+- inavec: https://gitlab.mpcdf.mpg.de/bbramas/inastemp 
     - constants taken from https://gitlab.mpcdf.mpg.de/bbramas/inastemp/-/blob/master/Src/Common/InaFastExp.hpp
     - as explained here: http://berenger.eu/blog/csimd-fast-exponential-computation-on-simd-architectures-implementation/
     - Remez approach is more accurate across the range than doing a least squares fit in of the polynomial in R with lm(...)
+- shibatch's Sleef library: https://github.com/shibatch/sleef seems to follow a similar approach
 
 # Results 
 
