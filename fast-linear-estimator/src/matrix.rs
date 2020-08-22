@@ -141,23 +141,21 @@ mod tests {
 
     #[test]
     fn structure_create_exact() {
+        // 5 rows, 10 columns
+        let rows = vec![
+            vec![1f32, 2., 3., 4., 5., 6., 7., 8., 9., 10.],
+            vec![1f32, 2., 3., 4., 5., 6., 7., 8., 9., 10.],
+            vec![1f32, 2., 3., 4., 5., 6., 7., 8., 9., 10.],
+            vec![1f32, 2., 3., 4., 5., 6., 7., 8., 9., 10.],
+            vec![1f32, 2., 3., 4., 5., 6., 7., 8., 9., 10.],
+        ];
+        let intecepts = [1f32, 2., 3., 4., 5., 6., 7., 8., 9., 10.];
 
-        // TODO -- add intercepts and check
+        let matrix = super::MatrixAvxF32::create_from_rows(&rows, &intecepts).unwrap();
 
-        // let rows = vec![
-        //     vec![1f32, 2., 3., 4., 5., 6., 7., 8.],
-        //     vec![9f32, 10., 11., 12., 13., 14., 15., 16.],
-        // ];
-
-        // let cf = crate::MatrixAvxF32ColumnSets::create_from_rows(&rows).unwrap();
-
-        // TODO
-
-        // assert_eq!(cf.num_columns, 8);
-        // assert_eq!(cf.num_rows, 2);
-        // assert_eq!(cf.rows.len(), 2);
-        // assert_eq!(cf.rows[0].len(), 1);
-        // assert_eq!(cf.rows[1].len(), 1);
+        assert_eq!(matrix.num_columns, 10);
+        assert_eq!(matrix.num_col_instrinsics, 2); // 2*8 required to represent 10 elements
+        assert_eq!(matrix.num_rows, 5);
     }
 
     #[test]
