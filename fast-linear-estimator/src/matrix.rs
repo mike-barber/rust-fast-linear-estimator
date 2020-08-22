@@ -1,7 +1,7 @@
 //use std::error::Error;
 use crate::exp_approx;
 use std::arch::x86_64::{
-    __m256, _mm256_add_ps, _mm256_broadcast_ss, _mm256_mul_ps, _mm256_setzero_ps,
+    __m256, _mm256_add_ps, _mm256_broadcast_ss, _mm256_mul_ps, _mm256_setzero_ps
 };
 use std::mem::transmute;
 
@@ -81,8 +81,11 @@ impl MatrixAvxF32 {
                     unsafe {
                         // broadcast value (since we already have a reference)
                         let val_broad = _mm256_broadcast_ss(val);
+                        // separate multiply add is faster here
                         let mult = _mm256_mul_ps(val_broad, *row_intrin);
                         accumulate = _mm256_add_ps(accumulate, mult);
+                        // not using FMA; it's slower here
+                        //accumulate = _mm256_fmadd_ps(val_broad, *row_intrin, accumulate);
                     }
                 }
                 // copy to destination (by interpreting the intrinsic as a slice) -- and we might
@@ -116,8 +119,11 @@ impl MatrixAvxF32 {
                     unsafe {
                         // broadcast value (since we already have a reference)
                         let val_broad = _mm256_broadcast_ss(val);
+                        // separate multiply add is faster here
                         let mult = _mm256_mul_ps(val_broad, *row_intrin);
                         accumulate = _mm256_add_ps(accumulate, mult);
+                        // not using FMA; it's slower here
+                        //accumulate = _mm256_fmadd_ps(val_broad, *row_intrin, accumulate);
                     }
                 }
 

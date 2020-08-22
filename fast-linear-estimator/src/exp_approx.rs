@@ -61,13 +61,14 @@ pub fn exp_approx_avxf32(x_in: __m256) -> __m256 {
         let xf = _mm256_sub_ps(x, fl);
 
         let mut kn = _mm256_set1_ps(exp_f32_const::C3);
+        // multiply add (no benefit from using FMA here, unfortunately)
         kn = _mm256_add_ps(_mm256_mul_ps(xf, kn), _mm256_set1_ps(exp_f32_const::C2));
         kn = _mm256_add_ps(_mm256_mul_ps(xf, kn), _mm256_set1_ps(exp_f32_const::C1));
         kn = _mm256_add_ps(_mm256_mul_ps(xf, kn), _mm256_set1_ps(exp_f32_const::C0));
         x = _mm256_sub_ps(x, kn);
 
         // create integer with bits in the right place, by rounding double to integer,
-        // then re-interpret as a double
+        // then re-interpret as a double; again no benefit from using FMA here
         let xf32 = _mm256_add_ps(
             _mm256_mul_ps(_mm256_set1_ps(exp_f32_const::S), x),
             _mm256_set1_ps(exp_f32_const::B),
@@ -103,13 +104,13 @@ mod tests {
     }
 
     #[test]
-    fn inavec_exp_approx_f32() {
+    fn exp_approx_f32() {
         let res: Vec<_> = VALS.iter().map(|&v| super::exp_approx_f32(v)).collect();
         check_assert(&res);
     }
 
     #[test]
-    fn inavec_exp_approx_avxf32() {
+    fn exp_approx_avxf32() {
         let input: __m256 = unsafe { _mm256_loadu_ps(&VALS[0]) };
         let res = super::exp_approx_avxf32(input);
 

@@ -113,6 +113,12 @@ fn bench_logistic(crit: &mut Criterion) {
     // directly implemented with iterators
     {
         // directly implemented with iterators
+        // note: this is misleadingly fast; it relies on the fact that the dimensions
+        //       are constant, and the compiler takes advantage of this. 
+        //       performance is a lot lower with variable input sizes :)
+        //
+        //       the MatrixAvxF32 accepts different dimensions. This does not, essentially.
+        // 
         crit.bench_function("matrix-direct-product", |b| {
             b.iter(|| {
                 let a = input_sets.iter().choose(&mut rnd).unwrap();

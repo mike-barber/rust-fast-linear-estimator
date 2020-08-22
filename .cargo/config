@@ -1,3 +1,6 @@
 [build]
 #rustflags = ["-C", "target-cpu=native", "-C", "target-feature=+sse3,+avx,+avx2,+fma" ]
-rustflags = ["-C", "target-cpu=native" ]
+
+# skylake is a good middle ground - yields excellent performance
+# on both modern Intel and Ryzen 3900X processors.
+rustflags = ["-C", "target-cpu=skylake" ]
