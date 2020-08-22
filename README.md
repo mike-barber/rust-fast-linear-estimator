@@ -81,14 +81,14 @@ ndarray-product         time:   [230.89 ns 231.82 ns 232.83 ns]
 - the final two benchmarks are for a parallel test of the library over a large number of iterations; these would be relevant for someone interested using this for inference for a large input set, for instance.
 - 20 inputs, 20 outputs as per [EstimatorBench.cs](csharp/FastLinearEstimator.Bench/EstimatorBench.cs)
 
-|                     Method |              Mean |            Error |           StdDev |
-|--------------------------- |------------------:|-----------------:|-----------------:|
-|           BenchRustProduct |          60.52 ns |         0.767 ns |         0.507 ns | * 
-|         BenchCSharpProduct |         415.55 ns |         2.938 ns |         1.943 ns |
-|           BenchRustSoftmax |          88.60 ns |         0.504 ns |         0.300 ns | *
-|         BenchCSharpSoftmax |         548.54 ns |         5.493 ns |         3.633 ns |
-| LargeParallelCSharpSoftmax | 241,181,575.00 ns | 3,817,938.772 ns | 2,525,330.106 ns |
-|   LargeParallelRustSoftmax |  34,845,397.32 ns |   370,337.996 ns |   193,693.933 ns |
+|                     Method |              Mean |            Error |           StdDev |  |
+|--------------------------- |------------------:|-----------------:|-----------------:|--|
+|           BenchRustProduct |          60.52 ns |         0.767 ns |         0.507 ns | *|
+|         BenchCSharpProduct |         415.55 ns |         2.938 ns |         1.943 ns |  |
+|           BenchRustSoftmax |          88.60 ns |         0.504 ns |         0.300 ns | *| 
+|         BenchCSharpSoftmax |         548.54 ns |         5.493 ns |         3.633 ns |  |
+| LargeParallelCSharpSoftmax | 241,181,575.00 ns | 3,817,938.772 ns | 2,525,330.106 ns |  |
+|   LargeParallelRustSoftmax |  34,845,397.32 ns |   370,337.996 ns |   193,693.933 ns |  |
 
 
 For testing various different input and output sizes, [EstimatorBenchSizeVariations.cs](csharp/FastLinearEstimator.Bench/EstimatorBenchSizeVariations.cs) is relevant, producing the following results.
