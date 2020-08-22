@@ -87,7 +87,6 @@ mod avx_f32 {
             false
         }
     }
-   
 
     #[cfg(test)]
     mod tests {

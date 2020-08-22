@@ -104,10 +104,7 @@ mod tests {
 
     #[test]
     fn inavec_exp_approx_f32() {
-        let res: Vec<_> = VALS
-            .iter()
-            .map(|&v| super::exp_approx_f32(v))
-            .collect();
+        let res: Vec<_> = VALS.iter().map(|&v| super::exp_approx_f32(v)).collect();
         check_assert(&res);
     }
 
