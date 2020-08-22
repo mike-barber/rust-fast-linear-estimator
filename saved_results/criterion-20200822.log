@@ -1,0 +1,62 @@
+❯ cargo bench
+   Compiling fast-linear-estimator-interop v0.1.0 (C:\Code\rust-fast-linear-estimator\
+   Compiling fast-linear-estimator v0.1.0 (C:\Code\rust-fast-linear-estimator\fast-lin
+    Finished bench [optimized] target(s) in 2.48s
+     Running target\release\deps\fast_linear_estimator-374f2d1e55abf110.exe
+
+running 6 tests
+test exp_approx::tests::exp_approx_avxf32 ... ignored
+test exp_approx::tests::exp_approx_f32 ... ignored
+test matrix::tests::product ... ignored
+test matrix::tests::product_large ... ignored
+test matrix::tests::product_softmax ... ignored
+test matrix::tests::structure_create_exact ... ignored
+
+     Running target\release\deps\benchmarks-e89d49c3b44d23a8.exe
+Gnuplot not found, using plotters backend
+choose-input            time:   [4.8538 ns 4.8943 ns 4.9398 ns]
+                        change: [-1.5788% -0.9620% -0.2795%] (p = 0.02 < 0.05)        
+                        Change within noise threshold.
+
+matrix-product          time:   [35.450 ns 35.680 ns 35.979 ns]
+                        change: [-0.6532% +0.0263% +0.6822%] (p = 0.94 > 0.05)        
+                        No change in performance detected.
+
+matrix-softmax          time:   [62.219 ns 62.401 ns 62.583 ns]
+                        change: [-1.5589% -1.0888% -0.6333%] (p = 0.00 < 0.05)        
+                        Change within noise threshold.
+
+matrix-direct-product   time:   [48.816 ns 49.097 ns 49.591 ns]
+                        change: [-3.4907% -0.9842% +1.2515%] (p = 0.47 > 0.05)        
+                        No change in performance detected.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+
+matrix-direct-softmax   time:   [190.48 ns 191.06 ns 191.57 ns]
+                        change: [-1.0716% -0.7739% -0.4493%] (p = 0.00 < 0.05)        
+                        Change within noise threshold.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+
+ndarray-setup-input-view
+                        time:   [4.8909 ns 4.9122 ns 4.9331 ns]
+                        change: [-0.6789% -0.2950% +0.0565%] (p = 0.16 > 0.05)        
+                        No change in performance detected.
+
+ndarray-product         time:   [230.89 ns 231.82 ns 232.83 ns]
+                        change: [-2.8184% -2.2810% -1.7271%] (p = 0.00 < 0.05)        
+                        Performance has improved.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) low mild
+
+ndarray-product-transposed
+                        time:   [223.14 ns 224.11 ns 225.03 ns]
+                        change: [-0.7593% +0.1080% +0.8100%] (p = 0.82 > 0.05)        
+                        No change in performance detected.
+
+     Running target\release\deps\fast_linear_estimator_interop-08d33c46b7c98de6.exe   
+
+running 1 test
+test avx_f32::tests::avx_matrix_interface ... ignored
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out
