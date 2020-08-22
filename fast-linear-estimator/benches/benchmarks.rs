@@ -41,12 +41,6 @@ fn bench_logistic(crit: &mut Criterion) {
     .take(NUM_INPUT_SETS)
     .collect();
 
-    // f32 equivalent inputs
-    let input_sets_float: Vec<Vec<f32>> = input_sets
-        .iter()
-        .map(|set| set.iter().map(|v| *v as f32).collect())
-        .collect();
-
     // coefficients
     let coeff_min: f32 = -0.05;
     let coeff_max: f32 = 0.05;
@@ -79,7 +73,7 @@ fn bench_logistic(crit: &mut Criterion) {
 
     crit.bench_function("choose-input", |b| {
         b.iter(|| {
-            let input = input_sets_float.iter().choose(&mut rnd).unwrap();
+            let input = input_sets.iter().choose(&mut rnd).unwrap();
             input[0]
         })
     });
@@ -93,8 +87,7 @@ fn bench_logistic(crit: &mut Criterion) {
         let mut output_f32 = vec![0f32; mat.num_columns];
         crit.bench_function("matrix-product", |b| {
             b.iter(|| {
-                let input_index = rnd.gen_range(0, NUM_INPUT_SETS);
-                let input = &(input_sets_float[input_index]);
+                let input = input_sets.iter().choose(&mut rnd).unwrap();
 
                 let some = mat.product(&input, &mut output_f32);
                 assert!(some.is_some());
@@ -107,8 +100,7 @@ fn bench_logistic(crit: &mut Criterion) {
         let mut output_f32 = vec![0f32; mat.num_columns];
         crit.bench_function("matrix-softmax", |b| {
             b.iter(|| {
-                let input_index = rnd.gen_range(0, NUM_INPUT_SETS);
-                let input = &(input_sets_float[input_index]);
+                let input = input_sets.iter().choose(&mut rnd).unwrap();
 
                 let some = mat.product_softmax_cumulative_approx(&input, &mut output_f32);
                 assert!(some.is_some());
@@ -124,7 +116,7 @@ fn bench_logistic(crit: &mut Criterion) {
 
         crit.bench_function("ndarray-setup-input", |b| {
             b.iter(|| {
-                let input = input_sets_float.iter().choose(&mut rnd).unwrap();
+                let input = input_sets.iter().choose(&mut rnd).unwrap();
                 let a = arr1(&input);
                 a[0]
             })
@@ -132,7 +124,7 @@ fn bench_logistic(crit: &mut Criterion) {
 
         crit.bench_function("ndarray-setup-input-view", |b| {
             b.iter(|| {
-                let input = input_sets_float.iter().choose(&mut rnd).unwrap();
+                let input = input_sets.iter().choose(&mut rnd).unwrap();
                 let a = ArrayView1::from(input);
                 a[0]
             })
@@ -140,7 +132,7 @@ fn bench_logistic(crit: &mut Criterion) {
 
         crit.bench_function("ndarray-mult", |b| {
             b.iter(|| {
-                let input = input_sets_float.iter().choose(&mut rnd).unwrap();
+                let input = input_sets.iter().choose(&mut rnd).unwrap();
                 let a = arr1(input);
                 let res = coeff_nd.dot(&a);
                 res[0]
@@ -149,7 +141,7 @@ fn bench_logistic(crit: &mut Criterion) {
 
         crit.bench_function("ndarray-mult-transposed", |b| {
             b.iter(|| {
-                let input = input_sets_float.iter().choose(&mut rnd).unwrap();
+                let input = input_sets.iter().choose(&mut rnd).unwrap();
                 let a = arr1(input);
                 let res = &a.dot(&coeff_nd_transpose);
                 res[0]
@@ -160,9 +152,7 @@ fn bench_logistic(crit: &mut Criterion) {
     // directly implemented with iterators
     crit.bench_function("matrix-direct-product", |b| {
         b.iter(|| {
-            let input_index = rnd.gen_range(0, NUM_INPUT_SETS);
-            let a = &(input_sets[input_index]);
-
+            let a = input_sets.iter().choose(&mut rnd).unwrap();
             let mut r = [0.0; NUM_OUTPUT];
 
             // matrix mult
