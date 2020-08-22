@@ -29,7 +29,7 @@ namespace FastLinearEstimator.Bench
             var config = DefaultConfig.Instance.AddJob(job);
 
             BenchmarkRunner.Run<EstimatorBench>(config);
-            //BenchmarkRunner.Run<EstimatorBenchSizeVariations>(config);
+            BenchmarkRunner.Run<EstimatorBenchSizeVariations>(config);
         }
     }
 }

@@ -4,11 +4,11 @@ namespace FastLinearEstimator.Bench
 {
     public class EstimatorBenchSizeVariations
     {
-        [Params(2,3,4,6,8,10,12,20,40)]
-        public int NumInputs = 8;
+        [Params(2,3,4,6,8,10,15,20,30,50,100)]
+        public int NumInputs = 1;
 
-        [Params(2,3,5,7,8,15,25,32,36,60,120)]
-        public int NumOutputs = 36;
+        [Params(2,3,4,6,8,10,15,20,30,50,100)]
+        public int NumOutputs = 1;
 
         private EstimatorBench _estimatorBench;
 
@@ -31,9 +31,9 @@ namespace FastLinearEstimator.Bench
         }
 
         [Benchmark]
-        public float BenchMultLoopSoftmaxCumulativeFloat() => _estimatorBench.BenchCSharpSoftmax();
+        public float BenchCSharpSoftmax() => _estimatorBench.BenchCSharpSoftmax();
 
         [Benchmark]
-        public float BenchMatrixSoftmaxCumulativeFloat() => _estimatorBench.BenchRustSoftmax();
+        public float BenchRustSoftmax() => _estimatorBench.BenchRustSoftmax();
     }
 }

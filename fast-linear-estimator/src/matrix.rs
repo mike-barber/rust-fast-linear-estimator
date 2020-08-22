@@ -145,7 +145,7 @@ impl MatrixAvxF32 {
 #[cfg(test)]
 mod tests {
 
-    use approx::{abs_diff_eq, assert_abs_diff_eq};
+    use approx::abs_diff_eq;
 
     #[test]
     fn structure_create_exact() {
