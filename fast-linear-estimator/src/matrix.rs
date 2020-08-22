@@ -94,50 +94,6 @@ impl MatrixAvxF32 {
         Some(())
     }
 
-    pub fn product_mask_store(&self, values: &[f32], destination: &mut [f32]) -> Option<()> {
-        use std::arch::x86_64::*;
-
-        // TODO: Use AVX2 -- kind of hard to test at home
-        let idx_lo = unsafe { _mm_set_epi32(3, 2, 1, 0) };
-        let idx_hi = unsafe { _mm_set_epi32(7, 6, 5, 4) };
-
-        if destination.len() != self.num_columns || values.len() != self.num_rows {
-            return None;
-        }
-
-        destination
-            .chunks_mut(SINGLES_PER_AVX)
-            .zip(self.column_intrinsics.iter())
-            .zip(self.intercept_intrinsics.iter())
-            .for_each(|((dst, col), intercepts)| {
-                // run multiplication and add to `accumulate`
-                let mut accumulate = *intercepts;
-                for (val, row_intrin) in values.iter().zip(col) {
-                    unsafe {
-                        // broadcast value (since we already have a reference)
-                        let val_broad = _mm256_broadcast_ss(val);
-                        let mult = _mm256_mul_ps(val_broad, *row_intrin);
-                        accumulate = _mm256_add_ps(accumulate, mult);
-                    }
-                }
-
-                // copy to destination -- and we might have a shorter final slice,
-                // so use a mask to do the store
-                unsafe {
-                    // prep storage mask; TODO: AVX2
-                    let length = _mm_set1_epi32(dst.len() as i32);
-                    let lo_mask = _mm_cmplt_epi32(idx_lo, length);
-                    let hi_mask = _mm_cmplt_epi32(idx_hi, length);
-                    let mask = _mm256_set_m128i(hi_mask, lo_mask);
-                    // and store using mask
-                    let ptr_dest: *mut f32 = transmute(dst.as_mut_ptr());
-                    _mm256_maskstore_ps(ptr_dest, mask, accumulate);
-                }
-            });
-
-        Some(())
-    }
-
     pub fn product_softmax_cumulative_approx(
         &self,
         values: &[f32],
