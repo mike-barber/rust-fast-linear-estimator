@@ -1,7 +1,7 @@
 //use std::error::Error;
 use crate::exp_approx;
 use std::arch::x86_64::{
-    __m256, _mm256_add_ps, _mm256_broadcast_ss, _mm256_mul_ps, _mm256_setzero_ps
+    __m256, _mm256_add_ps, _mm256_broadcast_ss, _mm256_mul_ps, _mm256_setzero_ps,
 };
 use std::mem::transmute;
 
@@ -145,6 +145,8 @@ impl MatrixAvxF32 {
 #[cfg(test)]
 mod tests {
 
+    use approx::{abs_diff_eq, assert_abs_diff_eq};
+
     #[test]
     fn structure_create_exact() {
         // 5 rows, 10 columns
@@ -166,6 +168,15 @@ mod tests {
 
     #[test]
     fn product() {
+        // in R,
+        //      > coeff = matrix(1:6, ncol=2)
+        //      > intercept = c(10,20,30)
+        //      > x = c(1,2)
+        //      > coeff %*% x + intercept
+        //      [,1]
+        //      [1,]   19
+        //      [2,]   32
+        //      [3,]   45
         let rows = vec![vec![1.0f32, 2.0, 3.0], vec![4.0f32, 5.0, 6.0]];
         let intercepts = [10f32, 20f32, 30f32];
         let matrix = super::MatrixAvxF32::create_from_rows(&rows, &intercepts).unwrap();
@@ -190,5 +201,28 @@ mod tests {
         assert_eq!(res[0], 1415_f32);
         assert_eq!(res[18], 1685_f32);
         assert_eq!(res[34], 1925_f32);
+    }
+
+    #[test]
+    fn product_softmax() {
+        //      > coeff = matrix(1:6, ncol=2)
+        //      > intercept = c(0.1, 0.2, 0.3)
+        //      > x = c(0.1, 0.5)
+        //      > logit = coeff %*% x + intercept
+        //      > cumsum(exp(logit))
+        //      [1]  9.025013 27.199159 63.797393
+
+        let rows = vec![vec![1.0f32, 2.0, 3.0], vec![4.0f32, 5.0, 6.0]];
+        let intercepts = [0.1f32, 0.2f32, 0.3f32];
+        let matrix = super::MatrixAvxF32::create_from_rows(&rows, &intercepts).unwrap();
+        let v = vec![0.1f32, 0.5f32];
+        let mut res = vec![0f32; 3];
+        matrix.product_softmax_cumulative_approx(&v, &mut res);
+
+        // check approximately equal (with faily large tolerance since the numbers are large)
+        let ok = res.iter()
+            .zip(&[9.025013_f32, 27.199159_f32, 63.797393_f32])
+            .all(|(a, b)| abs_diff_eq!(a, b, epsilon = 0.01f32));
+        assert!(ok);
     }
 }
