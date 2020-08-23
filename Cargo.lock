@@ -203,6 +203,7 @@ dependencies = [
  "ndarray",
  "rand",
  "rayon",
+ "rustc_version",
 ]
 
 [[package]]

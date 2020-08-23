@@ -3,4 +3,4 @@
 
 # skylake is a good middle ground - yields excellent performance
 # on both modern Intel and Ryzen 3900X processors.
-rustflags = ["-C", "target-cpu=skylake" ]
+#rustflags = ["-C", "target-cpu=skylake" ]

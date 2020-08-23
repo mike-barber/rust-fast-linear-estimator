@@ -1,7 +1,8 @@
-use std::arch::x86_64::{
-    __m256, _mm256_add_ps, _mm256_castsi256_ps, _mm256_cvtps_epi32, _mm256_cvtss_f32,
-    _mm256_floor_ps, _mm256_max_ps, _mm256_min_ps, _mm256_mul_ps, _mm256_set1_ps, _mm256_sub_ps,
-};
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
+
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::*;
 
 const EXP_BIAS_32: i32 = 127; // zero point for exponent
 
@@ -48,6 +49,7 @@ pub fn exp_approx_f32(x_in: f32) -> f32 {
 }
 
 #[allow(dead_code)]
+#[cfg(target_arch = "x86_64")]
 pub fn exp_approx_avxf32(x_in: __m256) -> __m256 {
     let mut x = x_in;
     unsafe {
@@ -80,16 +82,16 @@ pub fn exp_approx_avxf32(x_in: __m256) -> __m256 {
     }
 }
 
-#[allow(dead_code)]
-pub fn avx_ps_first_element(v: __m256) -> f32 {
-    unsafe { _mm256_cvtss_f32(v) }
-}
-
 #[cfg(test)]
 mod tests {
 
-    use approx::*;
+    #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
+
+    #[cfg(target_arch = "aarch64")]
+    use std::arch::aarch64::*;
+
+    use approx::*;
 
     const VALS: [f32; 8] = [-10_f32, -5., -1., 0., 1., 2., 5., 10.];
 
@@ -109,6 +111,7 @@ mod tests {
         check_assert(&res);
     }
 
+    #[cfg(target_arch = "x86_64")]
     #[test]
     fn exp_approx_avxf32() {
         let input: __m256 = unsafe { _mm256_loadu_ps(&VALS[0]) };
