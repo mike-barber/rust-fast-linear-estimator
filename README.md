@@ -2,18 +2,79 @@
 
 This is more of a proof of concept than an actual library. However, it does work and is pretty fast. These are the objectives I had in mind: 
 
-- test using a natively compiled Rust library from C# (.net core, of course)
+- test using a natively compiled Rust library from C# (.net core, of course) on Linux and Windows (x86_64)
     - create a safe C# wrapper that preserves the invariants required
-    - reduce the costs of calling the native library by using `Span` where appropriate
-    - avoid any allocations
-- use avx2 intrinsics in Rust to perform a fast matrix multiplication, and compare with
+    - reduce the costs of calling the native library by using `Span` and `stackalloc` where appropriate
+    - avoid any allocations in Rust or C#
+- use AVX intrinsics in Rust to perform a fast matrix multiplication, and compare with
     - direct multiplication using iterators
-    - a normal library appropriate for this, like `ndarray`
+    - a normal lib appropriate for this kind of task, like `ndarray`
 - work out a fast, relatively low accuracy way to approximate an exponential function
     - this is is required for the [softmax](https://en.wikipedia.org/wiki/Softmax_function) part of the logistic estimation
     - normal `exp` has way more accuracy than required for inference tasks, and is generally quite slow; implementations vary. 
     - approximate implementation using avx2 intrinsics is really fast
     - in the interests of performance over accuracy, I'm using a 4th order interpolation; refer to the resources below for the sources.
+
+## BLAS
+
+The obvious question might be: why not BLAS or MKL? There are a few reasons for this.
+
+- it's not much fun (this was a learning exercise as much as anything)
+- it's quite complex to get the build working on both Windows and Linux, so I haven't included it in this project; I might throw it on a branch or something if anyone is interested
+- it's actually *not* so fast for small matrices like these based on initial testing.
+    - BLAS will probably significantly outperform all of this stuff with larger matrices 
+    - I have a deliberately simple algorithm, but the simplicity of it works in our favour for small matrices
+- MKL: it's quite Intel specific; I'm running an AMD processor and interested in playing around with ARM too.
+
+## Structure
+
+This code does two things
+
+### Linear estimate from a regression model
+
+`y = x * [coeff] + [intercepts]`
+
+In R, 
+
+```R
+x = 1:2
+coeff = t(matrix(1:6, ncol=2))
+intercept = c(10,20,30)
+x %*% coeff + intercept
+```
+with results
+```
+> x
+[1] 1 2
+> coeff
+     [,1] [,2] [,3]
+[1,]    1    2    3
+[2,]    4    5    6
+> x %*% coeff + intercept
+     [,1] [,2] [,3]
+[1,]   19   32   45
+```
+
+### Logistic estimate from a regression model 
+
+Because of the way I want to use the results, I'm returning the cumulative sum of the softmax, without normalising it. Normally we'd sum the vector and divide it by this sum. I'm doing it a bit differently here. It's fairly trivial to add a method to return the probabilities or most likely class if desired.
+
+Example is similar to the above:
+```R
+coeff = t(matrix(1:6, ncol=2))
+intercept = c(0.1, 0.2, 0.3)
+x = c(0.1, 0.5)
+logit = x %*% coeff + intercept
+cumsum(exp(logit))
+```
+with results
+```
+> logit
+     [,1] [,2] [,3]
+[1,]  2.2  2.9  3.6
+> cumsum(exp(logit))
+[1]  9.025013 27.199159 63.797393
+```
 
 # Future plans
 
