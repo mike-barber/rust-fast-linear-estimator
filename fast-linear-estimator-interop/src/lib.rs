@@ -4,7 +4,7 @@ pub extern "C" fn test_add(a: i32, b: i32) -> i32 {
 }
 
 mod avx_f32 {
-    use fast_linear_estimator::matrix::MatrixAvxF32;
+    use fast_linear_estimator::matrix::MatrixF32;
     use std::slice;
 
     // coefficients: columns correspond to outputs; rows correspond to inputs;
@@ -15,13 +15,13 @@ mod avx_f32 {
         num_outputs: usize,
         coefficients: *const f32,
         intercepts: *const f32,
-    ) -> *mut MatrixAvxF32 {
+    ) -> *mut MatrixF32 {
         let cf = unsafe { slice::from_raw_parts(coefficients, num_outputs * num_inputs) };
         let rows: Vec<Vec<f32>> = cf.chunks(num_outputs).map(|row| row.to_vec()).collect();
 
         let intercepts = unsafe { slice::from_raw_parts(intercepts, num_outputs) };
 
-        if let Some(matrix) = MatrixAvxF32::create_from_rows(&rows, intercepts) {
+        if let Some(matrix) = MatrixF32::create_from_rows(&rows, intercepts) {
             Box::into_raw(Box::new(matrix))
         } else {
             std::ptr::null_mut()
@@ -30,7 +30,7 @@ mod avx_f32 {
 
     // clean up matrix
     #[no_mangle]
-    pub unsafe extern "C" fn matrix_avx_f32_delete(matrix: *mut MatrixAvxF32) {
+    pub unsafe extern "C" fn matrix_avx_f32_delete(matrix: *mut MatrixF32) {
         if !matrix.is_null() {
             drop(Box::from_raw(matrix));
         }
@@ -38,7 +38,7 @@ mod avx_f32 {
 
     #[no_mangle]
     pub extern "C" fn matrix_f32_product(
-        matrix: *mut MatrixAvxF32,
+        matrix: *mut MatrixF32,
         values: *const f32,
         values_length: usize,
         results: *mut f32,
@@ -64,7 +64,7 @@ mod avx_f32 {
 
     #[no_mangle]
     pub extern "C" fn matrix_f32_softmax_cumulative(
-        matrix: *mut MatrixAvxF32,
+        matrix: *mut MatrixF32,
         values: *const f32,
         values_length: usize,
         results: *mut f32,
