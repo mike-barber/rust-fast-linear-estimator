@@ -4,7 +4,7 @@ extern crate criterion;
 // TODO: Should be using black_box for input
 //use criterion::black_box;
 use criterion::Criterion;
-use fast_linear_estimator::matrix::MatrixAvxF32;
+use fast_linear_estimator::matrix::MatrixF32;
 use ndarray::Array2;
 use rand::prelude::*;
 use rand::Rng;
@@ -78,10 +78,10 @@ fn bench_logistic(crit: &mut Criterion) {
         })
     });
 
-    // MatrixAvxF32 benchmark
+    // MatrixF32 benchmark
     {
         let vec_coeff: Vec<Vec<f32>> = coeff_transpose.iter().map(|r| r.to_vec()).collect();
-        let mat = MatrixAvxF32::create_from_rows(&vec_coeff, &intercepts).unwrap();
+        let mat = MatrixF32::create_from_rows(&vec_coeff, &intercepts).unwrap();
 
         // copied to f32 output directly
         let mut output_f32 = vec![0f32; mat.num_columns];

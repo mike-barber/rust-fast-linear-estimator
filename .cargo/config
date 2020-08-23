@@ -4,3 +4,9 @@
 # skylake is a good middle ground - yields excellent performance
 # on both modern Intel and Ryzen 3900X processors.
 #rustflags = ["-C", "target-cpu=skylake" ]
+
+# arm raspberry pi / aarch64-unknown-linux-gnu
+rustflags = ["-C", "target-cpu=cortex-a72" ]
+
+# [target.<triple>]
+# [target.aarch64-unknown-linux-gnu]
