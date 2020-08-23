@@ -1,0 +1,87 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "C# debug benchmark",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/csharp/FastLinearEstimator.Bench/bin/Debug/netcoreapp3.1/FastLinearEstimator.Bench.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "preLaunchTask": "C# build debug",
+        },
+        {
+            "type": "lldb",
+            "request": "custom",
+            "name": "Native debug C#+Rust with LLDB",
+            "targetCreateCommands": [
+                "file dotnet"
+            ],
+            "processCreateCommands": [
+                "settings set target.run-args ${workspaceFolder}/csharp/FastLinearEstimator.Bench/bin/Debug/netcoreapp3.1/FastLinearEstimator.Bench.dll",
+                "process launch"
+            ],
+            "preLaunchTask": "C# build debug"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in 'fast-linear-estimator'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--package=fast-linear-estimator"
+                ],
+                "filter": {
+                    "name": "fast-linear-estimator",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in 'fast-linear-estimator-interop'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib=fast-linear-estimator-interop",
+                    "--package=fast-linear-estimator-interop"
+                ],
+                "filter": {
+                    "name": "fast-linear-estimator-interop",
+                    "kind": "cdylib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'benchmarks'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bench=benchmarks",
+                    "--package=fast-linear-estimator"
+                ],
+                "filter": {
+                    "name": "benchmarks",
+                    "kind": "bench"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

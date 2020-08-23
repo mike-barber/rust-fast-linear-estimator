@@ -1,0 +1,59 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cargo",
+			"command": "build",
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": "build",
+			"label": "rust: cargo build debug"
+		},
+		{
+			"type": "cargo",
+			"command": "build",
+			"args": [
+				"--release"
+			],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": "build",
+			"label": "rust: cargo build release"
+		},
+		{
+			"label": "C# build debug",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"build",
+				"${workspaceFolder}/FastLinearEstimator.sln",
+				"/property:GenerateFullPaths=true",
+				"/consoleloggerparameters:NoSummary"
+			],
+			"problemMatcher": "$msCompile",
+			"dependsOn": "rust: cargo build debug",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "C# build release",
+			"command": "dotnet",
+			"type": "process",
+			"args": [
+				"build",
+				"${workspaceFolder}/FastLinearEstimator.sln",
+				"/property:GenerateFullPaths=true",
+				"/consoleloggerparameters:NoSummary",
+				"--configuration",
+				"Release"
+			],
+			"problemMatcher": "$msCompile",
+			"dependsOn": "rust: cargo build release",
+			"group": "build",
+		}
+	]
+}
