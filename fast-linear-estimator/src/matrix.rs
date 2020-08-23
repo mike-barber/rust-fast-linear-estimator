@@ -1,8 +1,12 @@
 //use std::error::Error;
 use crate::exp_approx;
-use std::arch::x86_64::{
-    __m256, _mm256_add_ps, _mm256_broadcast_ss, _mm256_mul_ps, _mm256_setzero_ps,
-};
+
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
+
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::*;
+
 use std::mem::transmute;
 
 const SINGLES_PER_AVX: usize = 8;
@@ -10,6 +14,7 @@ const SINGLES_PER_AVX: usize = 8;
 // matrix of f32, but we split the supplied rows into
 // columns of AVX instrinsics (8 x 32-bit floats), and then
 // do a column-wise multiplication
+#[cfg(target_arch = "x86_64")]
 pub struct MatrixAvxF32 {
     pub num_columns: usize,
     pub num_col_instrinsics: usize,
@@ -18,6 +23,7 @@ pub struct MatrixAvxF32 {
     intercept_intrinsics: Vec<__m256>,
 }
 
+#[cfg(target_arch = "x86_64")]
 impl MatrixAvxF32 {
     pub fn create_from_rows(rows: &Vec<Vec<f32>>, intercepts: &[f32]) -> Option<Self> {
         let num_columns = rows.first()?.len();
@@ -143,6 +149,7 @@ impl MatrixAvxF32 {
 }
 
 #[cfg(test)]
+#[cfg(target_arch = "x86_64")]
 mod tests {
 
     use approx::abs_diff_eq;
