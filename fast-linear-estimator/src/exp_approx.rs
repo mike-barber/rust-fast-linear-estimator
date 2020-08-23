@@ -162,7 +162,7 @@ pub fn exp_approx_armf32(x_in: float32x4_t) -> float32x4_t {
         }
         let xf = vsubq_f32(x, fl);
 
-        let mut kn:float32x4_t = transmute(C_C3);
+        let mut kn: float32x4_t = transmute(C_C3);
         kn = vaddq_f32(vmulq_f32(xf, kn), transmute(C_C2));
         kn = vaddq_f32(vmulq_f32(xf, kn), transmute(C_C1));
         kn = vaddq_f32(vmulq_f32(xf, kn), transmute(C_C0));
@@ -170,24 +170,21 @@ pub fn exp_approx_armf32(x_in: float32x4_t) -> float32x4_t {
 
         // create integer with bits in the right place, by rounding double to integer,
         // then re-interpret as a double; again no benefit from using FMA here
-        let xf32 = vaddq_f32(
-            vmulq_f32(transmute(C_S), x),
-            transmute(C_B),
-        );
+        let xf32 = vaddq_f32(vmulq_f32(transmute(C_S), x), transmute(C_B));
 
-        let xf32v: &[f32;8] = transmute(&xf32);
+        let xf32v: &[f32; 8] = transmute(&xf32);
 
-        let i0:i32 = xf32v[0] as i32;
-        let i1:i32 = xf32v[1] as i32;
-        let i2:i32 = xf32v[2] as i32;
-        let i3:i32 = xf32v[3] as i32;
+        let i0: i32 = xf32v[0] as i32;
+        let i1: i32 = xf32v[1] as i32;
+        let i2: i32 = xf32v[2] as i32;
+        let i3: i32 = xf32v[3] as i32;
 
-        let f0:f32 = transmute(i0);
-        let f1:f32 = transmute(i1);
-        let f2:f32 = transmute(i2);
-        let f3:f32 = transmute(i3);
+        let f0: f32 = transmute(i0);
+        let f1: f32 = transmute(i1);
+        let f2: f32 = transmute(i2);
+        let f3: f32 = transmute(i3);
 
-        transmute_copy(&[f0,f1,f2,f3])
+        transmute_copy(&[f0, f1, f2, f3])
     }
 }
 
@@ -208,8 +205,8 @@ mod tests {
         VALS.iter().map(|v| v.exp()).collect()
     }
 
-    fn check_assert(vals: &[f32]) {
-        vals.iter().zip(expected().iter()).for_each(|(act, exp)| {
+    fn check_assert(expect: &[f32], vals: &[f32]) {
+        vals.iter().zip(expect.iter()).for_each(|(act, exp)| {
             assert_relative_eq!(exp, act, max_relative = 1e-4);
         });
     }
@@ -217,7 +214,7 @@ mod tests {
     #[test]
     fn exp_approx_f32() {
         let res: Vec<_> = VALS.iter().map(|&v| super::exp_approx_f32(v)).collect();
-        check_assert(&res);
+        check_assert(&expected(), &res);
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -227,6 +224,21 @@ mod tests {
         let res = super::exp_approx_avxf32(input);
 
         let res_f32 = crate::common::m256_f32_to_vec(&[res]);
-        check_assert(&res_f32);
+        check_assert(&expected(), &res_f32);
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    #[test]
+    fn exp_approx_armf32() {
+        unsafe {
+            let x1: float32x4_t = std::mem::transmute([-10_f32, -5., -1., 0.]);
+            let x2: float32x4_t = std::mem::transmute([1.0_f32, 2., 5., 10.]);
+
+            let res1:[f32;4] = std::mem::transmute(super::exp_approx_armf32(x1));
+            let res2:[f32;4] = std::mem::transmute(super::exp_approx_armf32(x2));
+
+            check_assert(&expected()[0..4], &res1);
+            check_assert(&expected()[4..8], &res2);
+        }
     }
 }
