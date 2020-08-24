@@ -1,4 +1,4 @@
-#![cfg_attr(feature = "nightly", feature(stdsimd))]
+#![cfg_attr(feature = "nightly", feature(stdsimd, asm))]
 //#![feature(stdsimd)]
 
 

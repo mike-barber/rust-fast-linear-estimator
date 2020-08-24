@@ -84,51 +84,53 @@ pub fn exp_approx_avxf32(x_in: __m256) -> __m256 {
 
 #[allow(dead_code)]
 #[cfg(target_arch = "aarch64")]
+#[inline(always)]
 pub fn exp_approx_armf32(x_in: float32x4_t) -> float32x4_t {
+    use super::common::*;
     use std::mem::{transmute, transmute_copy};
 
-    const C_LOG2E: [f32; 4] = [
-        std::f32::consts::LOG2_E,
-        std::f32::consts::LOG2_E,
-        std::f32::consts::LOG2_E,
-        std::f32::consts::LOG2_E,
-    ];
-    const C_C3: [f32; 4] = [
-        exp_f32_const::C3,
-        exp_f32_const::C3,
-        exp_f32_const::C3,
-        exp_f32_const::C3,
-    ];
-    const C_C2: [f32; 4] = [
-        exp_f32_const::C2,
-        exp_f32_const::C2,
-        exp_f32_const::C2,
-        exp_f32_const::C2,
-    ];
-    const C_C1: [f32; 4] = [
-        exp_f32_const::C1,
-        exp_f32_const::C1,
-        exp_f32_const::C1,
-        exp_f32_const::C1,
-    ];
-    const C_C0: [f32; 4] = [
-        exp_f32_const::C0,
-        exp_f32_const::C0,
-        exp_f32_const::C0,
-        exp_f32_const::C0,
-    ];
-    const C_S: [f32; 4] = [
-        exp_f32_const::S,
-        exp_f32_const::S,
-        exp_f32_const::S,
-        exp_f32_const::S,
-    ];
-    const C_B: [f32; 4] = [
-        exp_f32_const::B,
-        exp_f32_const::B,
-        exp_f32_const::B,
-        exp_f32_const::B,
-    ];
+    // const C_LOG2E: [f32; 4] = [
+    //     std::f32::consts::LOG2_E,
+    //     std::f32::consts::LOG2_E,
+    //     std::f32::consts::LOG2_E,
+    //     std::f32::consts::LOG2_E,
+    // ];
+    // const C_C3: [f32; 4] = [
+    //     exp_f32_const::C3,
+    //     exp_f32_const::C3,
+    //     exp_f32_const::C3,
+    //     exp_f32_const::C3,
+    // ];
+    // const C_C2: [f32; 4] = [
+    //     exp_f32_const::C2,
+    //     exp_f32_const::C2,
+    //     exp_f32_const::C2,
+    //     exp_f32_const::C2,
+    // ];
+    // const C_C1: [f32; 4] = [
+    //     exp_f32_const::C1,
+    //     exp_f32_const::C1,
+    //     exp_f32_const::C1,
+    //     exp_f32_const::C1,
+    // ];
+    // const C_C0: [f32; 4] = [
+    //     exp_f32_const::C0,
+    //     exp_f32_const::C0,
+    //     exp_f32_const::C0,
+    //     exp_f32_const::C0,
+    // ];
+    // const C_S: [f32; 4] = [
+    //     exp_f32_const::S,
+    //     exp_f32_const::S,
+    //     exp_f32_const::S,
+    //     exp_f32_const::S,
+    // ];
+    // const C_B: [f32; 4] = [
+    //     exp_f32_const::B,
+    //     exp_f32_const::B,
+    //     exp_f32_const::B,
+    //     exp_f32_const::B,
+    // ];
 
     let mut x = x_in;
     unsafe {
@@ -137,24 +139,35 @@ pub fn exp_approx_armf32(x_in: float32x4_t) -> float32x4_t {
         //       will rewrite later
         // x = vmin_f32(x, vld1q_dup_f32(&exp_f32_const::EXP_HI));
         // x = vmax_f32(x, vld1q_dup_f32(&exp_f32_const::EXP_LO_AVX_SIGNED));
-        {
-            let xv: &mut [f32; 4] = transmute(&mut x);
-            xv[0] = xv[0]
-                .min(exp_f32_const::EXP_HI)
-                .max(exp_f32_const::EXP_LO_AVX_SIGNED);
-            xv[1] = xv[1]
-                .min(exp_f32_const::EXP_HI)
-                .max(exp_f32_const::EXP_LO_AVX_SIGNED);
-            xv[2] = xv[2]
-                .min(exp_f32_const::EXP_HI)
-                .max(exp_f32_const::EXP_LO_AVX_SIGNED);
-            xv[3] = xv[3]
-                .min(exp_f32_const::EXP_HI)
-                .max(exp_f32_const::EXP_LO_AVX_SIGNED);
-        }
+        // {
+        //     let xv: &mut [f32; 4] = transmute(&mut x);
+        //     xv[0] = xv[0]
+        //         .min(exp_f32_const::EXP_HI)
+        //         .max(exp_f32_const::EXP_LO_AVX_SIGNED);
+        //     xv[1] = xv[1]
+        //         .min(exp_f32_const::EXP_HI)
+        //         .max(exp_f32_const::EXP_LO_AVX_SIGNED);
+        //     xv[2] = xv[2]
+        //         .min(exp_f32_const::EXP_HI)
+        //         .max(exp_f32_const::EXP_LO_AVX_SIGNED);
+        //     xv[3] = xv[3]
+        //         .min(exp_f32_const::EXP_HI)
+        //         .max(exp_f32_const::EXP_LO_AVX_SIGNED);
+        // }
+        asm!(
+            "dup.4s  {lov:v}, {lo:w}",               // broadcast to vector
+            "dup.4s  {hiv:v}, {hi:w}",               // broadcast to vector
+            "fmax.4s {x:v},   {x:v},   {lov:v}",
+            "fmin.4s {x:v},   {x:v},   {hiv:v}",
+            hi = in(reg) exp_f32_const::EXP_HI,
+            lo = in(reg) exp_f32_const::EXP_LO_AVX_SIGNED,
+            hiv = out(vreg) _, // clobbered
+            lov = out(vreg) _, // clobbered
+            x = inout(vreg) x,
+        );
 
         // apply approximation
-        x = vmulq_f32(x, transmute(C_LOG2E));
+        x = vmulq_f32(x, arm_broadcast_f32x4(std::f32::consts::LOG2_E));
         let fl: float32x4_t;
         {
             let xv: &mut [f32; 4] = transmute(&mut x);
@@ -162,15 +175,18 @@ pub fn exp_approx_armf32(x_in: float32x4_t) -> float32x4_t {
         }
         let xf = vsubq_f32(x, fl);
 
-        let mut kn: float32x4_t = transmute(C_C3);
-        kn = vaddq_f32(vmulq_f32(xf, kn), transmute(C_C2));
-        kn = vaddq_f32(vmulq_f32(xf, kn), transmute(C_C1));
-        kn = vaddq_f32(vmulq_f32(xf, kn), transmute(C_C0));
+        let mut kn: float32x4_t = arm_broadcast_f32x4(exp_f32_const::C3);
+        kn = vaddq_f32(vmulq_f32(xf, kn), arm_broadcast_f32x4(exp_f32_const::C2));
+        kn = vaddq_f32(vmulq_f32(xf, kn), arm_broadcast_f32x4(exp_f32_const::C1));
+        kn = vaddq_f32(vmulq_f32(xf, kn), arm_broadcast_f32x4(exp_f32_const::C0));
         x = vsubq_f32(x, kn);
 
         // create integer with bits in the right place, by rounding double to integer,
         // then re-interpret as a double; again no benefit from using FMA here
-        let xf32 = vaddq_f32(vmulq_f32(transmute(C_S), x), transmute(C_B));
+        let xf32 = vaddq_f32(
+            vmulq_f32(arm_broadcast_f32x4(exp_f32_const::S), x),
+            arm_broadcast_f32x4(exp_f32_const::B),
+        );
 
         let xf32v: &[f32; 8] = transmute(&xf32);
 
@@ -234,8 +250,8 @@ mod tests {
             let x1: float32x4_t = std::mem::transmute([-10_f32, -5., -1., 0.]);
             let x2: float32x4_t = std::mem::transmute([1.0_f32, 2., 5., 10.]);
 
-            let res1:[f32;4] = std::mem::transmute(super::exp_approx_armf32(x1));
-            let res2:[f32;4] = std::mem::transmute(super::exp_approx_armf32(x2));
+            let res1: [f32; 4] = std::mem::transmute(super::exp_approx_armf32(x1));
+            let res2: [f32; 4] = std::mem::transmute(super::exp_approx_armf32(x2));
 
             check_assert(&expected()[0..4], &res1);
             check_assert(&expected()[4..8], &res2);

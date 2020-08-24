@@ -235,6 +235,15 @@ impl MatrixF32 {
                         // separate multiply add is faster here
                         let mult = vmulq_f32(val_broad, *row_intrin);
                         accumulate = vaddq_f32(accumulate, mult);
+                        // asm!(
+                        //     "dup.4s {vect:v}, {val:w}",             // broadcast to vector
+                        //     "fmul.4s {vect:v}, {row:v}, {vect:v}",  // multiply
+                        //     "fadd.4s {acc:v}, {acc:v}, {vect:v}",   // accumulate
+                        //     val = in(reg) *val,
+                        //     row = in(vreg) *row_intrin,
+                        //     vect = out(vreg) _, // clobbered
+                        //     acc = inout(vreg) accumulate,
+                        // );
                     }
                 }
                 // copy to destination (by interpreting the intrinsic as a slice) -- and we might
