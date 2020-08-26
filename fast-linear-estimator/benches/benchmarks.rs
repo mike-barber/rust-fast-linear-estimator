@@ -27,7 +27,7 @@ use rand::Rng;
 
 // sizes
 const NUM_INPUT: usize = 20;
-const NUM_OUTPUT: usize = 25;
+const NUM_OUTPUT: usize = 20;
 const NUM_INPUT_SETS: usize = 250;
 
 fn bench_logistic(crit: &mut Criterion) {
