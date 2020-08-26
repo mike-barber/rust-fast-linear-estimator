@@ -27,7 +27,7 @@ use rand::Rng;
 
 // sizes
 const NUM_INPUT: usize = 20;
-const NUM_OUTPUT: usize = 20;
+const NUM_OUTPUT: usize = 25;
 const NUM_INPUT_SETS: usize = 250;
 
 fn bench_logistic(crit: &mut Criterion) {
@@ -193,6 +193,27 @@ fn bench_logistic(crit: &mut Criterion) {
                 let input = input_sets.iter().choose(&mut rnd).unwrap();
                 let a = ArrayView1::from(input);
                 let res = &a.dot(&coeff_nd_transpose);
+                res[0]
+            })
+        });
+
+        // using an iterator
+        crit.bench_function("ndarray-product-transposed-iterators", |b| {
+            // pre-allocated and reusable result
+            let mut res = ndarray::Array1::<f32>::zeros((NUM_OUTPUT,));
+            b.iter(|| {
+                let input = input_sets.iter().choose(&mut rnd).unwrap();
+                let a = ArrayView1::from(input);
+                res.fill(0.0);
+                Zip::from(coeff_nd_transpose.genrows())
+                    .and(&a)
+                    .apply(|cf,inp| {
+                        Zip::from(cf)
+                            .and(&mut res)
+                            .apply(|cc,rr| {
+                                *rr = cc * inp;
+                            });
+                    });
                 res[0]
             })
         });
