@@ -11,4 +11,5 @@ rustflags = ["-C", "target-cpu=skylake" ]
 
 # targeting my raspberry pi 4 for now
 [target.aarch64-unknown-linux-gnu]
-rustflags = ["-C", "target-cpu=cortex-a72" ]
+#rustflags = ["-C", "target-cpu=native" ] # AWS c6g.xlarge config
+rustflags = ["-C", "target-cpu=cortex-a72" ] # Raspberry Pi 4 config 
