@@ -86,121 +86,79 @@ pub fn exp_approx_avxf32(x_in: __m256) -> __m256 {
 #[cfg(target_arch = "aarch64")]
 #[inline(always)]
 pub fn exp_approx_armf32(x_in: float32x4_t) -> float32x4_t {
-    use super::common::*;
-    use std::mem::{transmute, transmute_copy};
+    use std::mem::transmute;
 
-    // const C_LOG2E: [f32; 4] = [
-    //     std::f32::consts::LOG2_E,
-    //     std::f32::consts::LOG2_E,
-    //     std::f32::consts::LOG2_E,
-    //     std::f32::consts::LOG2_E,
-    // ];
-    // const C_C3: [f32; 4] = [
-    //     exp_f32_const::C3,
-    //     exp_f32_const::C3,
-    //     exp_f32_const::C3,
-    //     exp_f32_const::C3,
-    // ];
-    // const C_C2: [f32; 4] = [
-    //     exp_f32_const::C2,
-    //     exp_f32_const::C2,
-    //     exp_f32_const::C2,
-    //     exp_f32_const::C2,
-    // ];
-    // const C_C1: [f32; 4] = [
-    //     exp_f32_const::C1,
-    //     exp_f32_const::C1,
-    //     exp_f32_const::C1,
-    //     exp_f32_const::C1,
-    // ];
-    // const C_C0: [f32; 4] = [
-    //     exp_f32_const::C0,
-    //     exp_f32_const::C0,
-    //     exp_f32_const::C0,
-    //     exp_f32_const::C0,
-    // ];
-    // const C_S: [f32; 4] = [
-    //     exp_f32_const::S,
-    //     exp_f32_const::S,
-    //     exp_f32_const::S,
-    //     exp_f32_const::S,
-    // ];
-    // const C_B: [f32; 4] = [
-    //     exp_f32_const::B,
-    //     exp_f32_const::B,
-    //     exp_f32_const::B,
-    //     exp_f32_const::B,
-    // ];
-
-    let mut x = x_in;
     unsafe {
-        // clamp x
-        // note: can't seem to find the right instructions defined
-        //       will rewrite later
-        // x = vmin_f32(x, vld1q_dup_f32(&exp_f32_const::EXP_HI));
-        // x = vmax_f32(x, vld1q_dup_f32(&exp_f32_const::EXP_LO_AVX_SIGNED));
-        // {
-        //     let xv: &mut [f32; 4] = transmute(&mut x);
-        //     xv[0] = xv[0]
-        //         .min(exp_f32_const::EXP_HI)
-        //         .max(exp_f32_const::EXP_LO_AVX_SIGNED);
-        //     xv[1] = xv[1]
-        //         .min(exp_f32_const::EXP_HI)
-        //         .max(exp_f32_const::EXP_LO_AVX_SIGNED);
-        //     xv[2] = xv[2]
-        //         .min(exp_f32_const::EXP_HI)
-        //         .max(exp_f32_const::EXP_LO_AVX_SIGNED);
-        //     xv[3] = xv[3]
-        //         .min(exp_f32_const::EXP_HI)
-        //         .max(exp_f32_const::EXP_LO_AVX_SIGNED);
-        // }
+        
+        // multiply, clamp and calculate the fractional part
+        let mut x = x_in;
+        let mut xf: float32x4_t;
         asm!(
-            "dup.4s  {lov:v}, {lo:w}",               // broadcast to vector
-            "dup.4s  {hiv:v}, {hi:w}",               // broadcast to vector
-            "fmax.4s {x:v},   {x:v},   {lov:v}",
-            "fmin.4s {x:v},   {x:v},   {hiv:v}",
+            "dup    {lov:v}.4s, {lo:w}",                    // broadcast to vector
+            "dup    {hiv:v}.4s, {hi:w}",                    // broadcast to vector
+            "fmax   {x:v}.4s,   {x:v}.4s,   {lov:v}.4s",    // max
+            "fmin   {x:v}.4s,   {x:v}.4s,   {hiv:v}.4s",    // min
+            "fmul   {x:v}.4s,   {x:v}.4s,   {l2e:v}.s[0]",  // multiply by scalar
+            "frintm {fl:v}.4s,  {x:v}.4s",                  // floor
+            "fsub   {xf:v}.4s,  {x:v}.4s,   {fl:v}.4s",    // xf = x - fl (fractional part)
             hi = in(reg) exp_f32_const::EXP_HI,
             lo = in(reg) exp_f32_const::EXP_LO_AVX_SIGNED,
+            l2e = in(vreg) std::f32::consts::LOG2_E,
             hiv = out(vreg) _, // clobbered
             lov = out(vreg) _, // clobbered
+            fl = out(vreg) _, // clobbered
             x = inout(vreg) x,
+            xf = out(vreg) xf,
+            options(nostack,nomem,pure)
         );
 
-        // apply approximation
-        x = vmulq_f32(x, arm_broadcast_f32x4(std::f32::consts::LOG2_E));
-        let fl: float32x4_t;
-        {
-            let xv: &mut [f32; 4] = transmute(&mut x);
-            fl = transmute([xv[0].floor(), xv[1].floor(), xv[2].floor(), xv[3].floor()]);
-        }
-        let xf = vsubq_f32(x, fl);
+        // calculate the approximation
+        asm!(
+            "dup    {kn:v}.4s,  {c3:w}",                    // kn = c3
+            
+            "dup    {c:v}.4s,   {c2:w}",
+            "fmul   {a:v}.4s,   {xf:v}.4s,  {kn:v}.4s",     // a = xf * kn
+            "fadd   {kn:v}.4s,  {a:v}.4s,   {c:v}.4s",      // kn = a + c2
 
-        let mut kn: float32x4_t = arm_broadcast_f32x4(exp_f32_const::C3);
-        kn = vaddq_f32(vmulq_f32(xf, kn), arm_broadcast_f32x4(exp_f32_const::C2));
-        kn = vaddq_f32(vmulq_f32(xf, kn), arm_broadcast_f32x4(exp_f32_const::C1));
-        kn = vaddq_f32(vmulq_f32(xf, kn), arm_broadcast_f32x4(exp_f32_const::C0));
-        x = vsubq_f32(x, kn);
+            "dup    {c:v}.4s,   {c1:w}",        
+            "fmul   {a:v}.4s,   {xf:v}.4s,  {kn:v}.4s",     // a = xf * kn
+            "fadd   {kn:v}.4s,  {a:v}.4s,   {c:v}.4s",      // kn = a + c1
+
+            "dup    {c:v}.4s,   {c0:w}",
+            "fmul   {a:v}.4s,   {xf:v}.4s,  {kn:v}.4s",     // a = xf * kn
+            "fadd   {kn:v}.4s,  {a:v}.4s,   {c:v}.4s",      // kn = a + c0
+
+            "fsub   {x:v}.4s,   {x:v}.4s,   {kn:v}.4s",     // x = x - kn
+            c3 = in(reg) exp_f32_const::C3,
+            c2 = in(reg) exp_f32_const::C2,
+            c1 = in(reg) exp_f32_const::C1,
+            c0 = in(reg) exp_f32_const::C0,
+            xf = in(vreg) xf,
+            kn = out(vreg) _,
+            a = out(vreg) _,
+            c = out(vreg) _,
+            x = inout(vreg) x,
+            options(nostack,nomem,pure)
+        );
 
         // create integer with bits in the right place, by rounding double to integer,
         // then re-interpret as a double; again no benefit from using FMA here
-        let xf32 = vaddq_f32(
-            vmulq_f32(arm_broadcast_f32x4(exp_f32_const::S), x),
-            arm_broadcast_f32x4(exp_f32_const::B),
+        let xi: int32x4_t;
+        asm!(
+            "dup    {Bv:v}.4s,  {B:w}",                     // broadcast B
+            "fmul   {x:v}.4s,   {x:v}.4s,   {S:v}.s[0]",    // x = x * S (with first element)
+            "fadd   {x:v}.4s,   {x:v}.4s,   {Bv:v}.4s",     // x = x + B
+            
+            "fcvtzs {xi:v}.4s,  {x:v}.4s",                  // i = x as i32 (convert, not cast)
+            S = in(vreg) exp_f32_const::S,                  // scalar within a 4-vector (first element)
+            B = in(reg) exp_f32_const::B,
+            x = in(vreg) x,
+            xi = out(vreg) xi,
+            Bv = out(vreg) _,
+            options(pure,nomem,nostack)
         );
-
-        let xf32v: &[f32; 8] = transmute(&xf32);
-
-        let i0: i32 = xf32v[0] as i32;
-        let i1: i32 = xf32v[1] as i32;
-        let i2: i32 = xf32v[2] as i32;
-        let i3: i32 = xf32v[3] as i32;
-
-        let f0: f32 = transmute(i0);
-        let f1: f32 = transmute(i1);
-        let f2: f32 = transmute(i2);
-        let f3: f32 = transmute(i3);
-
-        transmute_copy(&[f0, f1, f2, f3])
+        // now cast and return
+        transmute(xi)
     }
 }
 
@@ -230,7 +188,8 @@ mod tests {
     #[test]
     fn exp_approx_f32() {
         let res: Vec<_> = VALS.iter().map(|&v| super::exp_approx_f32(v)).collect();
-        check_assert(&expected(), &res);
+        let expect = expected();
+        check_assert(&expect, &res);
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -253,8 +212,9 @@ mod tests {
             let res1: [f32; 4] = std::mem::transmute(super::exp_approx_armf32(x1));
             let res2: [f32; 4] = std::mem::transmute(super::exp_approx_armf32(x2));
 
-            check_assert(&expected()[0..4], &res1);
-            check_assert(&expected()[4..8], &res2);
+            let expect = expected();
+            check_assert(&expect[0..4], &res1);
+            check_assert(&expect[4..8], &res2);
         }
     }
 }
