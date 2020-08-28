@@ -216,6 +216,19 @@ impl MatrixF32 {
         Some(mat)
     }
 
+    fn fused_multiply_add(acc: &mut float32x4_t, v1: float32x4_t, v2: f32) {
+        unsafe {
+            // fused multiply-add works a treat on the raspberry pi; a lot faster than separate ops
+            asm!(
+                "fmla   {acc:v}.4s,   {row:v}.4s, {val:v}.s[0]",    // fused multiply-add
+                row = in(vreg) v1,                                  // load row value
+                val = in(vreg) v2,                                  // load into first element of vector
+                acc = inout(vreg) *acc,
+                options(pure,nomem,nostack)
+            );
+        }
+    }
+
     pub fn product(&self, values: &[f32], destination: &mut [f32]) -> Option<()> {
         if destination.len() != self.num_columns || values.len() != self.num_rows {
             return None;
@@ -229,16 +242,7 @@ impl MatrixF32 {
                 // run multiplication and add to `accumulate`
                 let mut accumulate = *intercepts;
                 for (val, row_intrin) in values.iter().zip(col) {
-                    unsafe {
-                        // fused multiply-add works a treat on the raspberry pi; a lot faster than separate ops
-                        asm!(
-                            "fmla   {acc:v}.4s,   {row:v}.4s, {val:v}.s[0]",    // fused multiply-add
-                            val = in(vreg) *val,                                // load into first element of vector
-                            row = in(vreg) *row_intrin,                         // load row value
-                            acc = inout(vreg) accumulate,
-                            options(pure,nomem,nostack)
-                        );
-                    }
+                    Self::fused_multiply_add(&mut accumulate, *row_intrin, *val);
                 }
                 // copy to destination (by interpreting the intrinsic as a slice) -- and we might
                 // have a shorter final slice
@@ -268,16 +272,7 @@ impl MatrixF32 {
                 // run multiplication and add to `accumulate`, starting with the intercepts
                 let mut accumulate = *intercepts;
                 for (val, row_intrin) in values.iter().zip(col) {
-                    unsafe {
-                        // fused multiply-add works a treat on the raspberry pi; a lot faster than separate ops
-                        asm!(
-                            "fmla   {acc:v}.4s,   {row:v}.4s, {val:v}.s[0]",    // fused multiply-add
-                            val = in(vreg) *val,                                // load into first element of vector
-                            row = in(vreg) *row_intrin,                         // load row value
-                            acc = inout(vreg) accumulate,
-                            options(pure,nomem,nostack)
-                        );
-                    }
+                    Self::fused_multiply_add(&mut accumulate, *row_intrin, *val);
                 }
 
                 // copy to destination (taking into account final shorter stub) and apply cumulative softmax
