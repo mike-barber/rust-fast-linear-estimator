@@ -196,6 +196,27 @@ fn bench_logistic(crit: &mut Criterion) {
                 res[0]
             })
         });
+
+        // using an iterator
+        crit.bench_function("ndarray-product-transposed-iterators", |b| {
+            // pre-allocated and reusable result
+            let mut res = ndarray::Array1::<f32>::zeros((NUM_OUTPUT,));
+            b.iter(|| {
+                let input = input_sets.iter().choose(&mut rnd).unwrap();
+                let a = ArrayView1::from(input);
+                res.fill(0.0);
+                Zip::from(coeff_nd_transpose.genrows())
+                    .and(&a)
+                    .apply(|cf,inp| {
+                        Zip::from(cf)
+                            .and(&mut res)
+                            .apply(|cc,rr| {
+                                *rr = cc * inp;
+                            });
+                    });
+                res[0]
+            })
+        });
     }
 }
 
