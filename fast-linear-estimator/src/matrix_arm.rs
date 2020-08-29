@@ -11,12 +11,8 @@ pub struct MatrixF32 {
     intercept_intrinsics: Vec<float32x4_t>,
 }
 
-pub fn arm_zeros_f32x4() -> float32x4_t {
-    unsafe { std::mem::transmute([0f32,0f32,0f32,0f32]) }
-}
-
-pub fn arm_broadcast_f32x4(v:f32) -> float32x4_t {
-    unsafe { std::mem::transmute([v,v,v,v]) }
+pub fn arm_zeros() -> float32x4_t {
+    unsafe { std::mem::transmute([0f32;SINGLES_PER_INTRINSIC]) }
 }
 
 impl MatrixF32 {
@@ -39,7 +35,7 @@ impl MatrixF32 {
             num_col_instrinsics,
             num_rows: rows.len(),
             column_intrinsics: vec![],
-            intercept_intrinsics: vec![arm_zeros_f32x4(); num_col_instrinsics],
+            intercept_intrinsics: vec![arm_zeros(); num_col_instrinsics],
         };
 
         // copy intercepts
@@ -56,7 +52,7 @@ impl MatrixF32 {
             let mut col: Vec<float32x4_t> = Vec::new();
             for r in rows {
                 let chunk = r.chunks(SINGLES_PER_INTRINSIC).nth(chunk_num)?;
-                let mut packed = arm_zeros_f32x4();
+                let mut packed = arm_zeros();
                 let intrin =
                     unsafe { transmute::<&mut float32x4_t, &mut [f32; SINGLES_PER_INTRINSIC]>(&mut packed) };
                 intrin.iter_mut().zip(chunk).for_each(|(v, u)| *v = *u);
@@ -131,7 +127,7 @@ impl MatrixF32 {
                 // 1. approximate exponential
                 accumulate = crate::exp_approx_arm::exp_approx_armf32(accumulate);
                 // 2. accumulate and copy
-                let src = unsafe { transmute::<&float32x4_t, &[f32; SINGLES_PER_INTRINSIC]>(&accumulate) };
+                let src: &[f32;SINGLES_PER_INTRINSIC] = unsafe { transmute(&accumulate) };
                 dst.iter_mut().zip(src).for_each(|(d, s)| {
                     cumulative_sum += s;
                     *d = cumulative_sum;

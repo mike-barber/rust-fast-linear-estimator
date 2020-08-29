@@ -59,6 +59,19 @@ impl MatrixF32 {
         Some(mat)
     }
 
+    #[inline(always)]
+    fn multiply_add(accumulate: &mut __m256, v1: __m256, v2: f32) {
+        unsafe {
+            // broadcast value (since we already have a reference)
+            let val_broad = _mm256_set1_ps(v2);
+            // separate multiply add is faster here
+            let mult = _mm256_mul_ps(val_broad, v1);
+            *accumulate = _mm256_add_ps(*accumulate, mult);
+            // * not using FMA; it's slower here
+            //accumulate = _mm256_fmadd_ps(val_broad, *row_intrin, accumulate);
+        }
+    }
+
     pub fn product(&self, values: &[f32], destination: &mut [f32]) -> Option<()> {
         if destination.len() != self.num_columns || values.len() != self.num_rows {
             return None;
@@ -72,16 +85,7 @@ impl MatrixF32 {
                 // run multiplication and add to `accumulate`
                 let mut accumulate = *intercepts;
                 for (val, row_intrin) in values.iter().zip(col) {
-                    unsafe {
-                        // broadcast value (since we already have a reference)
-                        let val_broad = _mm256_broadcast_ss(val);
-                        // separate multiply add is faster here
-                        let mult = _mm256_mul_ps(val_broad, *row_intrin);
-                        accumulate = _mm256_add_ps(accumulate, mult);
-                        // * not using FMA; it's slower here
-                        //accumulate = _mm256_fmadd_ps(val_broad, *row_intrin, accumulate);
-                        // * also not unrolling this loop manually; also doesn't add perf.
-                    }
+                    Self::multiply_add(&mut accumulate, *row_intrin, *val);
                 }
                 // copy to destination (by interpreting the intrinsic as a slice) -- and we might
                 // have a shorter final slice
@@ -111,22 +115,14 @@ impl MatrixF32 {
                 // run multiplication and add to `accumulate`, starting with the intercepts
                 let mut accumulate = *intercepts;
                 for (val, row_intrin) in values.iter().zip(col) {
-                    unsafe {
-                        // broadcast value (since we already have a reference)
-                        let val_broad = _mm256_broadcast_ss(val);
-                        // separate multiply add is faster here
-                        let mult = _mm256_mul_ps(val_broad, *row_intrin);
-                        accumulate = _mm256_add_ps(accumulate, mult);
-                        // not using FMA; it's slower here
-                        //accumulate = _mm256_fmadd_ps(val_broad, *row_intrin, accumulate);
-                    }
+                    Self::multiply_add(&mut accumulate, *row_intrin, *val);
                 }
 
                 // copy to destination (taking into account final shorter stub) and apply cumulative softmax
                 // 1. approximate exponential
                 accumulate = crate::exp_approx_avx::exp_approx_avxf32(accumulate);
                 // 2. accumulate and copy
-                let src = unsafe { transmute::<&__m256, &[f32; 8]>(&accumulate) };
+                let src: &[f32;SINGLES_PER_INTRINSIC] = unsafe { transmute(&accumulate) };
                 dst.iter_mut().zip(src).for_each(|(d, s)| {
                     cumulative_sum += s;
                     *d = cumulative_sum;
