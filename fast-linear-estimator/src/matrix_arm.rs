@@ -1,7 +1,7 @@
 use std::arch::aarch64::*;
 use std::mem::transmute;
 
-const SINGLES_PER_INTRINSIC: usize = 4;
+pub const SINGLES_PER_INTRINSIC: usize = 4;
 
 pub struct MatrixF32 {
     pub num_columns: usize,

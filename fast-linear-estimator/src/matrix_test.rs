@@ -11,7 +11,8 @@ mod tests {
 
     #[cfg(target_arch = "aarch64")]
     use crate::matrix_arm::MatrixF32;
-
+    #[cfg(target_arch = "aarch64")]
+    use crate::matrix_arm::SINGLES_PER_INTRINSIC;
 
     #[test]
     fn structure_create_exact() {
