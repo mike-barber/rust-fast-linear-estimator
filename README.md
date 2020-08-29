@@ -4,9 +4,9 @@ This is more of a proof of concept than an actual library. However, it does work
 
 - Test using a natively compiled Rust library from C# (DotNet Core, of course)
     - running on the following platforms
-        - Linux x86_64
-        - Windows x86_64
-        - Linux aarch64 (ARM)
+        - Linux x86_64 on Rust `stable`
+        - Windows x86_64 on Rust `stable`
+        - Linux aarch64 (ARM) on Rust `nightly` 
     - create a safe C# wrapper that preserves the invariants required
     - reduce the costs of calling the native library by using `Span` and `stackalloc` where appropriate
     - avoid any allocations in Rust or C#
