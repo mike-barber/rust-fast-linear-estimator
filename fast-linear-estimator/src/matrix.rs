@@ -60,11 +60,9 @@ impl MatrixF32 {
             let mut col: Vec<__m256> = Vec::new();
             for r in rows {
                 let chunk = r.chunks(SINGLES_PER_INTRINSIC).nth(chunk_num)?;
-                let mut packed = unsafe { _mm256_setzero_ps() };
-                let intrin =
-                    unsafe { transmute::<&mut __m256, &mut [f32; SINGLES_PER_INTRINSIC]>(&mut packed) };
-                intrin.iter_mut().zip(chunk).for_each(|(v, u)| *v = *u);
-                col.push(packed);
+                let mut intrin = [0f32; SINGLES_PER_INTRINSIC];
+                intrin[..chunk.len()].copy_from_slice(chunk);
+                col.push(unsafe { transmute(intrin) });
             }
             mat.column_intrinsics.push(col);
         }
@@ -91,13 +89,14 @@ impl MatrixF32 {
                         // separate multiply add is faster here
                         let mult = _mm256_mul_ps(val_broad, *row_intrin);
                         accumulate = _mm256_add_ps(accumulate, mult);
-                        // not using FMA; it's slower here
+                        // * not using FMA; it's slower here
                         //accumulate = _mm256_fmadd_ps(val_broad, *row_intrin, accumulate);
+                        // * also not unrolling this loop manually; also doesn't add perf.
                     }
                 }
                 // copy to destination (by interpreting the intrinsic as a slice) -- and we might
                 // have a shorter final slice
-                let src = unsafe { transmute::<&__m256, &[f32; 8]>(&accumulate) };
+                let src: &[f32; SINGLES_PER_INTRINSIC] = unsafe { transmute(&accumulate) };
                 dst.copy_from_slice(&src[0..(dst.len())]);
             });
 
@@ -375,7 +374,8 @@ mod tests {
         matrix.product_softmax_cumulative_approx(&v, &mut res);
 
         // check approximately equal (with faily large tolerance since the numbers are large)
-        let ok = res.iter()
+        let ok = res
+            .iter()
             .zip(&[9.025013_f32, 27.199159_f32, 63.797393_f32])
             .all(|(a, b)| abs_diff_eq!(a, b, epsilon = 0.01f32));
         assert!(ok);
