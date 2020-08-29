@@ -61,7 +61,7 @@ pub fn exp_approx_armf32(x_in: float32x4_t) -> float32x4_t {
         );
 
         // create integer with bits in the right place, by rounding double to integer,
-        // then re-interpret as a double; again no benefit from using FMA here
+        // then re-interpret as a double
         let xi: int32x4_t;
         asm!(
             "dup    {Bv:v}.4s,  {B:w}",                     // broadcast B

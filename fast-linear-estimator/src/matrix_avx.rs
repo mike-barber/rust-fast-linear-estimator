@@ -14,6 +14,10 @@ pub struct MatrixF32 {
     intercept_intrinsics: Vec<__m256>,
 }
 
+pub fn zeros() -> __m256 {
+    unsafe { std::mem::transmute([0f32; SINGLES_PER_INTRINSIC]) }
+}
+
 impl MatrixF32 {
     pub fn create_from_rows(rows: &Vec<Vec<f32>>, intercepts: &[f32]) -> Option<Self> {
         let num_columns = rows.first()?.len();
@@ -32,7 +36,7 @@ impl MatrixF32 {
             num_col_instrinsics,
             num_rows: rows.len(),
             column_intrinsics: vec![],
-            intercept_intrinsics: vec![unsafe { _mm256_setzero_ps() }; num_col_instrinsics],
+            intercept_intrinsics: vec![zeros(); num_col_instrinsics],
         };
 
         // copy intercepts
@@ -90,7 +94,7 @@ impl MatrixF32 {
                 // copy to destination (by interpreting the intrinsic as a slice) -- and we might
                 // have a shorter final slice
                 let src: &[f32; SINGLES_PER_INTRINSIC] = unsafe { transmute(&accumulate) };
-                dst.copy_from_slice(&src[0..(dst.len())]);
+                dst.copy_from_slice(&src[0..dst.len()]);
             });
 
         Some(())
@@ -122,7 +126,7 @@ impl MatrixF32 {
                 // 1. approximate exponential
                 accumulate = crate::exp_approx_avx::exp_approx_avxf32(accumulate);
                 // 2. accumulate and copy
-                let src: &[f32;SINGLES_PER_INTRINSIC] = unsafe { transmute(&accumulate) };
+                let src: &[f32; SINGLES_PER_INTRINSIC] = unsafe { transmute(&accumulate) };
                 dst.iter_mut().zip(src).for_each(|(d, s)| {
                     cumulative_sum += s;
                     *d = cumulative_sum;
@@ -132,5 +136,3 @@ impl MatrixF32 {
         Some(())
     }
 }
-
-

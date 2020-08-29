@@ -3,6 +3,9 @@ use std::mem::transmute;
 
 pub const SINGLES_PER_INTRINSIC: usize = 4;
 
+// matrix of f32, but we split the supplied rows into
+// columns of ARM instrinsics (4 x 32-bit floats), and then
+// do a column-wise multiplication
 pub struct MatrixF32 {
     pub num_columns: usize,
     pub num_col_instrinsics: usize,
@@ -11,14 +14,12 @@ pub struct MatrixF32 {
     intercept_intrinsics: Vec<float32x4_t>,
 }
 
-pub fn arm_zeros() -> float32x4_t {
-    unsafe { std::mem::transmute([0f32;SINGLES_PER_INTRINSIC]) }
+pub fn zeros() -> float32x4_t {
+    unsafe { std::mem::transmute([0f32; SINGLES_PER_INTRINSIC]) }
 }
 
 impl MatrixF32 {
-
     pub fn create_from_rows(rows: &Vec<Vec<f32>>, intercepts: &[f32]) -> Option<Self> {
-        
         let num_columns = rows.first()?.len();
         if num_columns != intercepts.len() {
             return None;
@@ -35,7 +36,7 @@ impl MatrixF32 {
             num_col_instrinsics,
             num_rows: rows.len(),
             column_intrinsics: vec![],
-            intercept_intrinsics: vec![arm_zeros(); num_col_instrinsics],
+            intercept_intrinsics: vec![zeros(); num_col_instrinsics],
         };
 
         // copy intercepts
@@ -52,11 +53,9 @@ impl MatrixF32 {
             let mut col: Vec<float32x4_t> = Vec::new();
             for r in rows {
                 let chunk = r.chunks(SINGLES_PER_INTRINSIC).nth(chunk_num)?;
-                let mut packed = arm_zeros();
-                let intrin =
-                    unsafe { transmute::<&mut float32x4_t, &mut [f32; SINGLES_PER_INTRINSIC]>(&mut packed) };
-                intrin.iter_mut().zip(chunk).for_each(|(v, u)| *v = *u);
-                col.push(packed);
+                let mut intrin = [0f32; SINGLES_PER_INTRINSIC];
+                intrin[..chunk.len()].copy_from_slice(chunk);
+                col.push(unsafe { transmute(intrin) });
             }
             mat.column_intrinsics.push(col);
         }
@@ -64,7 +63,8 @@ impl MatrixF32 {
         Some(mat)
     }
 
-    fn fused_multiply_add(acc: &mut float32x4_t, v1: float32x4_t, v2: f32) {
+    #[inline(always)]
+    fn multiply_add(acc: &mut float32x4_t, v1: float32x4_t, v2: f32) {
         unsafe {
             // fused multiply-add works a treat on the raspberry pi; a lot faster than separate ops
             asm!(
@@ -90,12 +90,12 @@ impl MatrixF32 {
                 // run multiplication and add to `accumulate`
                 let mut accumulate = *intercepts;
                 for (val, row_intrin) in values.iter().zip(col) {
-                    Self::fused_multiply_add(&mut accumulate, *row_intrin, *val);
+                    Self::multiply_add(&mut accumulate, *row_intrin, *val);
                 }
                 // copy to destination (by interpreting the intrinsic as a slice) -- and we might
                 // have a shorter final slice
-                let src = unsafe { transmute::<&float32x4_t, &[f32; SINGLES_PER_INTRINSIC]>(&accumulate) };
-                dst.copy_from_slice(&src[0..(dst.len())]);
+                let src: &[f32; SINGLES_PER_INTRINSIC] = unsafe { transmute(&accumulate) };
+                dst.copy_from_slice(&src[0..dst.len()]);
             });
 
         Some(())
@@ -120,14 +120,14 @@ impl MatrixF32 {
                 // run multiplication and add to `accumulate`, starting with the intercepts
                 let mut accumulate = *intercepts;
                 for (val, row_intrin) in values.iter().zip(col) {
-                    Self::fused_multiply_add(&mut accumulate, *row_intrin, *val);
+                    Self::multiply_add(&mut accumulate, *row_intrin, *val);
                 }
 
                 // copy to destination (taking into account final shorter stub) and apply cumulative softmax
                 // 1. approximate exponential
                 accumulate = crate::exp_approx_arm::exp_approx_armf32(accumulate);
                 // 2. accumulate and copy
-                let src: &[f32;SINGLES_PER_INTRINSIC] = unsafe { transmute(&accumulate) };
+                let src: &[f32; SINGLES_PER_INTRINSIC] = unsafe { transmute(&accumulate) };
                 dst.iter_mut().zip(src).for_each(|(d, s)| {
                     cumulative_sum += s;
                     *d = cumulative_sum;
