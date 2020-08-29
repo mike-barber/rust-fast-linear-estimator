@@ -89,7 +89,7 @@ with results
 
 # ARM support
 
-On Rust `nightly`, we have support for `aarch64` (ARM 64) intrinsics. I've added a variant of the same algorithm to test it on ARM too, and verified it works on both my RaspberryPi 4 (with Ubuntu, because Raspbian is still 32b), and on an AWS Graviton2 (c6.g) server. 
+On Rust `nightly`, we have support for `aarch64` (ARM 64) intrinsics. I've added a variant of the same algorithm to test it on ARM too, and verified it works on both my RaspberryPi 4 (with Ubuntu, because Raspbian is still 32b), and on an AWS Graviton2 [C6g](https://aws.amazon.com/ec2/instance-types/c6/) server. 
 
 A bit of extra work was required figuring out how to use the conditional compilation effectively, and working out how to cross-compile for ARM from my workstation. It takes a while to build on the Pi, and it's a lot faster finding issues with the checked running on a fast machine. It's also worth noting that ARM intrinsics are still only supported in `nightly` Rust. I didn't want the whole project to require `nightly`, so it's configured to build the x86_64 configuration on stable. There's an addition to the [build.rs](fast-linear-estimator/build.rs) script to flip a feature switch on: `nightly`; and this enables the required `stdsimd` and `asm` features at crate level: `#![cfg_attr(feature = "nightly", feature(stdsimd, asm))]`
 
@@ -166,7 +166,7 @@ ndarray-product         time:   [230.89 ns 231.82 ns 232.83 ns]
 Note that several benchmarks are recorded in [saved_results](saved_results) too:
 - Ryzen 3900X (x86_64)
 - RaspberryPi 4 (aarch64)
-- AWS Graviton c6g (aarch64)
+- AWS Graviton2 C6g (aarch64)
 
 The x86_64 benchmark results are copied in below:
 
