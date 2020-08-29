@@ -2,18 +2,25 @@
 
 This is more of a proof of concept than an actual library. However, it does work and is pretty fast. These are the objectives I had in mind: 
 
-- test using a natively compiled Rust library from C# (.net core, of course) on Linux and Windows (x86_64)
+- Test using a natively compiled Rust library from C# (.net core, of course) on Linux and Windows (x86_64)
     - create a safe C# wrapper that preserves the invariants required
     - reduce the costs of calling the native library by using `Span` and `stackalloc` where appropriate
     - avoid any allocations in Rust or C#
-- use AVX intrinsics in Rust to perform a fast matrix multiplication, and compare with
+- Use AVX intrinsics in Rust to perform a fast matrix multiplication, and compare with
     - direct multiplication using iterators
     - a normal lib appropriate for this kind of task, like `ndarray`
-- work out a fast, relatively low accuracy way to approximate an exponential function
+- Create ARM (aarch64) implementations of the same algorithms
+- Work out a fast, relatively low accuracy way to approximate an exponential function
     - this is is required for the [softmax](https://en.wikipedia.org/wiki/Softmax_function) part of the logistic estimation
     - normal `exp` has way more accuracy than required for inference tasks, and is generally quite slow; implementations vary. 
     - approximate implementation using avx2 intrinsics is really fast
     - in the interests of performance over accuracy, I'm using a 4th order interpolation; refer to the resources below for the sources.
+
+## Caveats
+
+This contains `unsafe` code in several places. You can't do SIMD or FFI without it. Having said that, there's probably more unsafe code than required.
+
+The x86 and ARM matrix algorithms are nearly identical, so there's a lot of repeated code. I could to smarter things with generics and traits, but it would the code more obscure. I've left it as is for readability.
 
 ## BLAS
 
@@ -24,13 +31,13 @@ The obvious question might be: why not BLAS or MKL? There are a few reasons for 
 - it's actually *not* so fast for small matrices like these based on initial testing.
     - BLAS will probably significantly outperform all of this stuff with larger matrices 
     - I have a deliberately simple algorithm, but the simplicity of it works in our favour for small matrices
-- MKL: it's quite Intel specific; I'm running an AMD processor and interested in playing around with ARM too.
+- MKL: it's quite Intel specific; I'm running an AMD processor and playing around with ARM too.
 
 ## Structure
 
-This code does two things
+This code does two things:
 
-### Linear estimate from a regression model
+### 1. Linear estimate from a regression model
 
 `y = x * [coeff] + [intercepts]`
 
@@ -55,7 +62,7 @@ with results
 [1,]   19   32   45
 ```
 
-### Logistic estimate from a regression model 
+### 2. Logistic estimate from a regression model 
 
 Because of the way I want to use the results, I'm returning the cumulative sum of the softmax, without normalising it. Normally we'd sum the vector and divide it by this sum. I'm doing it a bit differently here. It's fairly trivial to add a method to return the probabilities or most likely class if desired.
 
@@ -76,21 +83,29 @@ with results
 [1]  9.025013 27.199159 63.797393
 ```
 
+# ARM support
+
+On Rust `nightly`, we have support for `aarch64` (ARM 64) intrinsics. I've added a variant of the same algorithm to test it on ARM too, and verified it works on both my RaspberryPi 4 (with Ubuntu, because Raspbian is still 32b), and on an AWS Graviton2 (c6.g) server. 
+
+A bit of extra work was required figuring out how to use the conditional compilation effectively, and working out how to cross-compile for ARM from my workstation. It takes a while to build on the Pi, and it's a lot faster finding issues with the checked running on a fast machine. It's also worth noting that ARM intrinsics are still only supported in `nightly` Rust. I didn't want the whole project to require `nightly`, so it's configured to build the x86_64 configuration on stable. There's an addition to the [build.rs](fast-linear-estimator/build.rs) script to flip a feature switch on: `nightly`; and this enables the required `stdsimd` and `asm` features at crate level: `#![cfg_attr(feature = "nightly", feature(stdsimd, asm))]`
+
+It's also worth nothing that we don't have a full set of ARM intrinsics available in Rust yet either, as far as I can tell from the [core::arch::aarch64](https://doc.rust-lang.org/core/arch/aarch64/index.html) documentation. It's a work in progress, and I'm sure they'll be there fairly soon. Examples currently include `dup`, `fmin` and `fmax` (vector-vector), `frintm`, etc.
+
+I'd assumed I could just use the intrinsics like on x86_64, but landed up using inline assembly instead due to several of them being missing. This was actually a really interesting detour into the world of ARM assembly. Since it's my first foray into ARM and inline assembly in Rust, I'm quite sure it's horrible. But it does work, and appears to be reasonably fast. 
+
+I've copied benchmark results into the [saved_results](saved_results) directory, for both my RaspberryPi 4 and AWS Graviton2 runs.
+
+ARM in Rust is also an interesting potential use, as C# does not have ARM intrinsics yet. It could be useful as a way to leverage that sort of hardware until C# supports the intrinsics natively. The above benchmarks are exactly this: calling Rust with ARM assembly from C#.
+
 # Future plans
+
+It'll be interesting to keep an eye on Rust SIMD in general, particularly the [packed_simd](https://rust-lang.github.io/packed_simd/packed_simd/) work going on.
 
 ## C# intrinsics
 
 C# now supports x86_64 intrinsics, so I will probably add the identical algorithm in C# and compare the performance. This wasn't really the point of this work though: I really wanted to work out how to attach a fast algorithm written in Rust to C#. 
 
 Some initial experimentation with C# suggested the performance would be good, but not quite on par with Rust since the compiler can't optimise as effectively. However, we are paying a small interop cost calling Rust, so it may prove to be just as effective overall.
-
-## ARM support
-
-On Rust `nightly`, we have support for `aarch64` (ARM 64) intrinsics. It'll be interesting to add a variant of the same algorithm to test it on ARM too. I've already verified this works on my RaspberryPi 4 (with Ubuntu, because Raspbian is still 32b). Some work needs to be done around figuring out how to use the conditional compilation effectively, and working out how to cross-compile for ARM from my workstation. It takes a while to build on the Pi ;)
-
-It's also an interesting potential use, as C# does not have ARM intrinsics yet. If it works well on the Pi, I should probably benchmark it on some powerful hardware, like an AWS Graviton2 instance. It could be useful as a way to leverage that sort of hardware until C# supports the intrinsics natively.
-
-It'll be interesting to keep an eye on Rust SIMD in general, particularly the [packed_simd](https://rust-lang.github.io/packed_simd/packed_simd/) work going on.
 
 ## Build process improvements
 
@@ -107,6 +122,8 @@ I didn't make up my own exponential approximation algorithm. There are several a
     - as explained here: http://berenger.eu/blog/csimd-fast-exponential-computation-on-simd-architectures-implementation/
     - Remez approach is more accurate across the range than doing a least squares fit in of the polynomial in R with lm(...)
 - shibatch's Sleef library: https://github.com/shibatch/sleef seems to follow a similar approach
+
+The ARM algorithm is an exact port of the AVX I'd already implemented, just for 4-single vectors instead of the AVX 8-singles.
 
 # Results 
 
@@ -142,6 +159,13 @@ ndarray-product         time:   [230.89 ns 231.82 ns 232.83 ns]
 - the final two benchmarks are for a parallel test of the library over a large number of iterations; these would be relevant for someone interested using this for inference for a large input set, for instance.
 - 20 inputs, 20 outputs as per [EstimatorBench.cs](csharp/FastLinearEstimator.Bench/EstimatorBench.cs)
 
+Note that several benchmarks are recorded in [saved_results](saved_results) too:
+- Ryzen 3900X (x86_64)
+- RaspberryPi 4 (aarch64)
+- AWS Graviton c6g (aarch64)
+
+The x86_64 benchmark results are copied in below:
+
 |                     Method |              Mean |            Error |           StdDev |  |
 |--------------------------- |------------------:|-----------------:|-----------------:|--|
 |           BenchRustProduct |          60.52 ns |         0.767 ns |         0.507 ns | *|
@@ -150,6 +174,7 @@ ndarray-product         time:   [230.89 ns 231.82 ns 232.83 ns]
 |         BenchCSharpSoftmax |         548.54 ns |         5.493 ns |         3.633 ns |  |
 | LargeParallelCSharpSoftmax | 241,181,575.00 ns | 3,817,938.772 ns | 2,525,330.106 ns |  |
 |   LargeParallelRustSoftmax |  34,845,397.32 ns |   370,337.996 ns |   193,693.933 ns |  |
+
 
 
 For testing various different input and output sizes, [EstimatorBenchSizeVariations.cs](csharp/FastLinearEstimator.Bench/EstimatorBenchSizeVariations.cs) is relevant, producing the following results.
