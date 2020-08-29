@@ -7,7 +7,7 @@ namespace FastLinearEstimator.Bench
 {
     class Program
     {
-        static void Main(string[] args)
+        static void Main()
         {
             // tests
             EstimatorBench.SelfTest();

@@ -1,2 +1,5 @@
 #!/bin/bash
-cargo build --target aarch64-unknown-linux-gnu
+
+# cross-compile to arm
+# requires nightly; arm intrinsics not stablised yet
+cargo +nightly build --release --target=aarch64-unknown-linux-gnu

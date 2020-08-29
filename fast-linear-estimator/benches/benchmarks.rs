@@ -1,29 +1,19 @@
 #[macro_use]
 extern crate criterion;
 
-// TODO: Should be using black_box for input
+// TODO: Should be using black_box for constant inputs
 //use criterion::black_box;
+
 use criterion::Criterion;
-use fast_linear_estimator::matrix::MatrixF32;
 use ndarray::Array2;
 use rand::prelude::*;
 use rand::Rng;
 
-//use rand;
-//use rand::prelude::*;
-//use rayon::prelude::*;
+#[cfg(target_arch = "x86_64")]
+use fast_linear_estimator::matrix_avx::MatrixF32;
 
-// example from https://github.com/bheisler/criterion.rs
-// fn fibonacci(n: u64) -> u64 {
-//     match n {
-//         0 => 1,
-//         1 => 1,
-//         n => fibonacci(n - 1) + fibonacci(n - 2),
-//     }
-// }
-// fn example_benchmark(c: &mut Criterion) {
-//     c.bench_function("fib 20", |b| b.iter(|| fibonacci(black_box(20))));
-// }
+#[cfg(target_arch = "aarch64")]
+use fast_linear_estimator::matrix_arm::MatrixF32;
 
 // sizes
 const NUM_INPUT: usize = 20;
