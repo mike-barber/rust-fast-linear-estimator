@@ -2,7 +2,11 @@
 
 This is more of a proof of concept than an actual library. However, it does work and is pretty fast. These are the objectives I had in mind: 
 
-- Test using a natively compiled Rust library from C# (.net core, of course) on Linux and Windows (x86_64)
+- Test using a natively compiled Rust library from C# (DotNet Core, of course)
+    - running on the following platforms
+        - Linux x86_64
+        - Windows x86_64
+        - Linux aarch64 (ARM)
     - create a safe C# wrapper that preserves the invariants required
     - reduce the costs of calling the native library by using `Span` and `stackalloc` where appropriate
     - avoid any allocations in Rust or C#
