@@ -42,7 +42,7 @@ namespace FastLinearEstimator.Bench
                 }
             }
 
-            for (var op=0; op<NumOutputs; ++op)
+            for (var op = 0; op < NumOutputs; ++op)
             {
                 _intercepts[op] = (float)_rng.NextDouble();
             }
@@ -214,10 +214,10 @@ namespace FastLinearEstimator.Bench
                 (i, state, rng) =>
                 {
                     var acc = 0f;
+                    Span<float> output = stackalloc float[NumOutputs];
                     for (var iter = 0; iter < PER_ITERATION; ++iter)
                     {
                         var input = GetRandomInputFloat(rng);
-                        Span<float> output = stackalloc float[NumOutputs];
                         func(input, output);
                         acc += output[0];
                     }
