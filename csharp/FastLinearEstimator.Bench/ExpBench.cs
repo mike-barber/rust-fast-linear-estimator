@@ -10,10 +10,13 @@ namespace FastLinearEstimator.Bench
 
     public class ExpBench
     {
+        private const int _len = 8;
+        private const int _reps = 100;
         private const int _numInputSets = 250;
         readonly private Random _rng = new Random();
 
         private float[][] _inputSets;
+        private int _nextInput = 0;
 
 
         [GlobalSetup]
@@ -22,52 +25,96 @@ namespace FastLinearEstimator.Bench
             // setup input sets
             _inputSets = Enumerable.Range(0, 250).Select(_ =>
             {
-                var inp = Enumerable.Range(0, 8).Select(_ => (float)_rng.NextDouble() * 10).ToArray();
+                var inp = Enumerable.Range(0, _len).Select(_ => (float)_rng.NextDouble() * 10).ToArray();
                 return inp;
             }).ToArray();
         }
 
-        private float[] GetRandomInputFloat() => _inputSets[_rng.Next(_numInputSets)];
-
-        [Benchmark]
-        public float BaselineSelect()
+        private float[] GetInput()
         {
-            return GetRandomInputFloat()[0];
+            _nextInput = (_nextInput + 1) % _numInputSets;
+            return _inputSets[_nextInput];
         }
 
-        [Benchmark]
-        public float ExpScalar()
+        // Amortised cost of selecting input
+        [Benchmark(OperationsPerInvoke = _len)]
+        public float BaselineSelect()
         {
-            var input = GetRandomInputFloat();
-            Span<float> res = stackalloc float[8];
-            for (var i = 0; i < input.Length; ++i)
+            return GetInput()[0];
+        }
+
+        [Benchmark(OperationsPerInvoke = _len)]
+        public float ExpAccurateScalar()
+        {
+            var input = GetInput();
+            Span<float> val = input.AsSpan(0, _len);
+            Span<float> res = stackalloc float[input.Length];
+
+            for (var r = 0; r < _reps; ++r)
             {
-                res[i] = MathF.Exp(input[i]);
+                res[0] = MathF.Exp(input[0]);
+                res[1] = MathF.Exp(input[1]);
+                res[2] = MathF.Exp(input[2]);
+                res[3] = MathF.Exp(input[3]);
+                res[4] = MathF.Exp(input[4]);
+                res[5] = MathF.Exp(input[5]);
+                res[6] = MathF.Exp(input[6]);
+                res[7] = MathF.Exp(input[7]);
             }
             return res[0];
         }
 
-        [Benchmark]
+        [Benchmark(OperationsPerInvoke = _len)]
+        public float ExpApproxScalar()
+        {
+            var input = GetInput();
+            Span<float> val = input.AsSpan(0, _len);
+            Span<float> res = stackalloc float[input.Length];
+
+            for (var r = 0; r < _reps; ++r)
+            {
+                res[0] = ExpApprox.ExpApproxScalar(input[0]);
+                res[1] = ExpApprox.ExpApproxScalar(input[1]);
+                res[2] = ExpApprox.ExpApproxScalar(input[2]);
+                res[3] = ExpApprox.ExpApproxScalar(input[3]);
+                res[4] = ExpApprox.ExpApproxScalar(input[4]);
+                res[5] = ExpApprox.ExpApproxScalar(input[5]);
+                res[6] = ExpApprox.ExpApproxScalar(input[6]);
+                res[7] = ExpApprox.ExpApproxScalar(input[7]);
+            }
+            return res[0];
+        }
+
+        [Benchmark(OperationsPerInvoke = _len)]
         public float ExpAvx()
         {
-            var input = GetRandomInputFloat();
+            var input = GetInput();
             unsafe
             {
-                fixed (float* p = input)
+                var res = Vector256<float>.Zero;
+                for (var r = 0; r < _reps; ++r)
                 {
-                    var vec = Avx.LoadVector256(p);
-                    var res = ExpApprox.ExpApproxAvx(vec);
-                    return res.GetElement(0);
+                    fixed (float* p = input)
+                    {
+
+                        var vec = Avx.LoadVector256(p);
+                        res = ExpApprox.ExpApproxAvx(vec);
+                    }
                 }
+                return res.GetElement(0);
             }
         }
 
-        [Benchmark]
+        [Benchmark(OperationsPerInvoke = _len)]
         public float ExpVector()
         {
-            var input = GetRandomInputFloat();
-            var vec = new Vector<float>(input);
-            var res = ExpApprox.ExpApproxVector(vec);
+            var input = GetInput();
+            var res = Vector<float>.Zero;
+            for (var r = 0; r < _reps; ++r)
+            {
+                var vec = new Vector<float>(input);
+                res = ExpApprox.ExpApproxVector(vec);
+            }
             return res[0];
         }
     }

@@ -18,6 +18,18 @@ namespace FastLinearEstimator.Test
             return _inputs.Select(v => MathF.Exp(v)).ToArray();
         }
 
+        [Fact]
+        public void ExpApproxScalar()
+        {
+            var expected = Expected();
+            var resArr = _inputs.Select(ExpApprox.ExpApproxScalar).ToArray();
+
+            for (var i = 0; i < 8; ++i)
+            {
+                AssertAlmostEqual(expected[i], resArr[i], _tolerance);
+            }
+        }
+
 
         [Fact]
         public void ExpApproxAvx()

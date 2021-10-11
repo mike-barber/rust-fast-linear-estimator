@@ -23,6 +23,28 @@ namespace FastLinearEstimator
         public const float S = (float)(1u << 23);
         public const float B = S * (float)EXP_BIAS_32;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float ExpApproxScalar(float val)
+        {
+            float x = val;
+            x = MathF.Min(x, EXP_HI);
+            x = MathF.Max(x, EXP_LO_AVX_SIGNED);
+
+            x = x * LOG2_E;
+            float fl = MathF.Floor(x);
+            float xf = x - fl;
+
+            float kn = C3;
+            kn = xf * kn + C2;
+            kn = xf * kn + C1;
+            kn = xf * kn + C0;
+            x = x - kn;
+
+            float xf32 = S * x + B;
+            int xul = (int)xf32;
+            float res = Unsafe.As<int,float>(ref xul);
+            return res;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector256<float> ExpApproxAvx(Vector256<float> vector)
