@@ -1,6 +1,9 @@
 [workspace]
 members = ["fast-linear-estimator", "fast-linear-estimator-interop"]
 
-# enable debug symbol output on all packages in release mode
 [profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+# enable debug symbol output on all packages in release mode
 debug = true
