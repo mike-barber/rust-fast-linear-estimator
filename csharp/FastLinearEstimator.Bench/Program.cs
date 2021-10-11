@@ -7,7 +7,7 @@ namespace FastLinearEstimator.Bench
 {
     class Program
     {
-        static void Main()
+        static void Main(string[] args)
         {
             // tests
             EstimatorBench.SelfTest();
@@ -28,8 +28,7 @@ namespace FastLinearEstimator.Bench
 
             var config = DefaultConfig.Instance.AddJob(job);
 
-            BenchmarkRunner.Run<EstimatorBench>(config);
-            BenchmarkRunner.Run<EstimatorBenchSizeVariations>(config);
+            BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args, config);
         }
     }
 }
