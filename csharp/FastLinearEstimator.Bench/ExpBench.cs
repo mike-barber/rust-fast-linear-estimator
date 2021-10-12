@@ -117,6 +117,20 @@ namespace FastLinearEstimator.Bench
             }
             return res[0];
         }
+
+        // not very efficient for short vectors
+        [Benchmark(OperationsPerInvoke = _len)]
+        public float ExpRustInterop()
+        {
+            var input = GetInput();
+            Span<float> res = stackalloc float[input.Length];
+            for (var r = 0; r < _reps; ++r)
+            {
+                input.CopyTo(res);
+                RustSafe.ExpApproxInPlace(res);
+            }
+            return res[0];
+        }
     }
 
 }

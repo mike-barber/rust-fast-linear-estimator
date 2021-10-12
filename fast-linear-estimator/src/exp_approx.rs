@@ -42,6 +42,43 @@ pub fn exp_approx_f32(x_in: f32) -> f32 {
     res
 }
 
+#[allow(dead_code)]
+#[cfg(target_arch = "x86_64")]
+pub fn exp_approx_slice_in_place(vals: &mut [f32]) {
+    use std::arch::x86_64::{_mm256_loadu_ps, _mm256_setzero_ps, _mm256_storeu_ps};
+    use crate::exp_approx_avx::exp_approx_avxf32;
+
+    let mut chunks = vals.chunks_exact_mut(8);
+    (&mut chunks).for_each(|ch| {
+        let mut v = unsafe { _mm256_loadu_ps(ch.as_ptr()) };
+        v = exp_approx_avxf32(v);
+        unsafe {
+            _mm256_storeu_ps(ch.as_mut_ptr(), v);
+        }
+    });
+
+    let rem = chunks.into_remainder();
+    if rem.len() > 0 {
+        unsafe {
+            let mut v = _mm256_setzero_ps();
+            
+            let slice_in: &mut [f32;8] = std::mem::transmute(&mut v);
+            slice_in[0..rem.len()].copy_from_slice(rem);
+
+            let res = exp_approx_avxf32(v);
+            
+            let slice_out: &[f32;8] = std::mem::transmute(&res);
+            rem.copy_from_slice(&slice_out[0..rem.len()]);
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[cfg(target_arch = "aarch64")]
+fn exp_approx_slice_in_place(vals: &mut [f32]) {
+    todo!();
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -49,8 +86,8 @@ mod tests {
 
     const VALS: [f32; 8] = [-10_f32, -5., -1., 0., 1., 2., 5., 10.];
 
-    fn expected() -> Vec<f32> {
-        VALS.iter().map(|v| v.exp()).collect()
+    fn expected(vals: &[f32]) -> Vec<f32> {
+        vals.iter().map(|v| v.exp()).collect()
     }
 
     fn check_assert(expect: &[f32], vals: &[f32]) {
@@ -62,7 +99,7 @@ mod tests {
     #[test]
     fn exp_approx_f32() {
         let res: Vec<_> = VALS.iter().map(|&v| super::exp_approx_f32(v)).collect();
-        let expect = expected();
+        let expect = expected(&VALS);
         check_assert(&expect, &res);
     }
 
@@ -74,8 +111,8 @@ mod tests {
         let input: __m256 = unsafe { _mm256_loadu_ps(&VALS[0]) };
         let res = crate::exp_approx_avx::exp_approx_avxf32(input);
 
-        let res_f32:[f32;8] = unsafe{ std::mem::transmute(res) };
-        check_assert(&expected(), &res_f32);
+        let res_f32: [f32; 8] = unsafe { std::mem::transmute(res) };
+        check_assert(&expected(&VALS), &res_f32);
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -94,5 +131,15 @@ mod tests {
             check_assert(&expect[0..4], &res1);
             check_assert(&expect[4..8], &res2);
         }
+    }
+
+    #[test]
+    fn exp_approx_slice_in_place() {
+        let mut vals = vec![-3f32,-2.,-1.,0.,1.,2.,3.,4.,5.,6.,7.,8.,9.];
+        let expected = expected(&vals);
+
+        crate::exp_approx::exp_approx_slice_in_place(&mut vals);
+        
+        check_assert(&expected, &vals);
     }
 }

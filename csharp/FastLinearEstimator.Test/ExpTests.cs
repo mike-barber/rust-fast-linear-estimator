@@ -30,6 +30,21 @@ namespace FastLinearEstimator.Test
             }
         }
 
+        [Fact]
+        public void ExpApproxRust() 
+        {
+            var expected = Expected();
+            
+            var vals = new float[8];
+            _inputs.CopyTo(vals.AsSpan());
+
+            RustSafe.ExpApproxInPlace(vals);
+
+            for (var i = 0; i < 8; ++i)
+            {
+                AssertAlmostEqual(expected[i], vals[i], _tolerance);
+            }
+        }
 
         [Fact]
         public void ExpApproxAvx()
