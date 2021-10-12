@@ -45,8 +45,8 @@ pub fn exp_approx_f32(x_in: f32) -> f32 {
 #[allow(dead_code)]
 #[cfg(target_arch = "x86_64")]
 pub fn exp_approx_slice_in_place(vals: &mut [f32]) {
-    use std::arch::x86_64::{_mm256_loadu_ps, _mm256_setzero_ps, _mm256_storeu_ps};
     use crate::exp_approx_avx::exp_approx_avxf32;
+    use std::arch::x86_64::{_mm256_loadu_ps, _mm256_setzero_ps, _mm256_storeu_ps};
 
     let mut chunks = vals.chunks_exact_mut(8);
     (&mut chunks).for_each(|ch| {
@@ -61,14 +61,49 @@ pub fn exp_approx_slice_in_place(vals: &mut [f32]) {
     if rem.len() > 0 {
         unsafe {
             let mut v = _mm256_setzero_ps();
-            
-            let slice_in: &mut [f32;8] = std::mem::transmute(&mut v);
+
+            let slice_in: &mut [f32; 8] = std::mem::transmute(&mut v);
             slice_in[0..rem.len()].copy_from_slice(rem);
 
             let res = exp_approx_avxf32(v);
-            
-            let slice_out: &[f32;8] = std::mem::transmute(&res);
+
+            let slice_out: &[f32; 8] = std::mem::transmute(&res);
             rem.copy_from_slice(&slice_out[0..rem.len()]);
+        }
+    }
+}
+
+#[allow(dead_code)]
+#[cfg(target_arch = "x86_64")]
+pub fn exp_approx_slice(vals: &[f32], res: &mut [f32]) {
+    use crate::exp_approx_avx::exp_approx_avxf32;
+    use std::arch::x86_64::{_mm256_loadu_ps, _mm256_setzero_ps, _mm256_storeu_ps};
+
+    let mut in_chunks = vals.chunks_exact(8);
+    let mut res_chunks = res.chunks_exact_mut(8);
+    (&mut in_chunks)
+        .zip(&mut res_chunks)
+        .for_each(|(ch_in, ch_out)| {
+            let mut v = unsafe { _mm256_loadu_ps(ch_in.as_ptr()) };
+            v = exp_approx_avxf32(v);
+            unsafe {
+                _mm256_storeu_ps(ch_out.as_mut_ptr(), v);
+            }
+        });
+
+    let in_rem = in_chunks.remainder();
+    let out_rem = res_chunks.into_remainder();
+    if in_rem.len() > 0 {
+        unsafe {
+            let mut v = _mm256_setzero_ps();
+
+            let slice_in: &mut [f32; 8] = std::mem::transmute(&mut v);
+            slice_in[0..in_rem.len()].copy_from_slice(in_rem);
+
+            let res = exp_approx_avxf32(v);
+
+            let slice_out: &[f32; 8] = std::mem::transmute(&res);
+            out_rem.copy_from_slice(&slice_out[0..in_rem.len()]);
         }
     }
 }
@@ -135,11 +170,11 @@ mod tests {
 
     #[test]
     fn exp_approx_slice_in_place() {
-        let mut vals = vec![-3f32,-2.,-1.,0.,1.,2.,3.,4.,5.,6.,7.,8.,9.];
+        let mut vals = vec![-3f32, -2., -1., 0., 1., 2., 3., 4., 5., 6., 7., 8., 9.];
         let expected = expected(&vals);
 
         crate::exp_approx::exp_approx_slice_in_place(&mut vals);
-        
+
         check_assert(&expected, &vals);
     }
 }

@@ -4,7 +4,13 @@ extern crate criterion;
 // TODO: Should be using black_box for constant inputs
 //use criterion::black_box;
 
+use std::arch::x86_64::_mm256_loadu_ps;
+
 use criterion::Criterion;
+use criterion::black_box;
+use fast_linear_estimator::exp_approx::exp_approx_slice;
+use fast_linear_estimator::exp_approx::exp_approx_slice_in_place;
+use fast_linear_estimator::exp_approx_avx;
 use ndarray::Array2;
 use rand::prelude::*;
 use rand::Rng;
@@ -104,11 +110,11 @@ fn bench_logistic(crit: &mut Criterion) {
     {
         // directly implemented with iterators
         // note: this is misleadingly fast; it relies on the fact that the dimensions
-        //       are constant, and the compiler takes advantage of this. 
+        //       are constant, and the compiler takes advantage of this.
         //       performance is a lot lower with variable input sizes :)
         //
         //       the MatrixAvxF32 accepts different dimensions. This does not, essentially.
-        // 
+        //
         crit.bench_function("matrix-direct-product", |b| {
             b.iter(|| {
                 let a = input_sets.iter().choose(&mut rnd).unwrap();
@@ -197,17 +203,119 @@ fn bench_logistic(crit: &mut Criterion) {
                 res.fill(0.0);
                 Zip::from(coeff_nd_transpose.genrows())
                     .and(&a)
-                    .apply(|cf,inp| {
-                        Zip::from(cf)
-                            .and(&mut res)
-                            .apply(|cc,rr| {
-                                *rr = cc * inp;
-                            });
+                    .apply(|cf, inp| {
+                        Zip::from(cf).and(&mut res).apply(|cc, rr| {
+                            *rr = cc * inp;
+                        });
                     });
                 res[0]
             })
         });
     }
+}
+
+fn bench_exponent_native(crit: &mut Criterion) {
+    let num_inputs = 100;
+
+    #[cfg(target_arch = "x86_64")]
+    const VWIDTH: usize = 8;
+
+    #[cfg(target_arch = "aarch64")]
+    const WIDTH: usize = 4;
+
+    // build random input sets
+    let mut rnd = rand::thread_rng();
+    let input_sets: Vec<Vec<f32>> = std::iter::repeat_with(|| {
+        std::iter::repeat_with(|| rnd.gen_range(-3.0, 3.0))
+            .take(VWIDTH)
+            .collect()
+    })
+    .take(num_inputs)
+    .collect();
+
+    crit.bench_function("exp-base-exact", |b| {
+        let mut it = input_sets.iter().cycle();
+        b.iter(|| {
+            let input = black_box(it.next().unwrap());
+            let v = input.get(0).unwrap();
+            v.exp()
+        })
+    });
+
+    crit.bench_function("exp-base-exact-8", |b| {
+        let mut it = input_sets.iter().cycle();
+        b.iter(|| {
+            let input = black_box(it.next().unwrap());
+            let mut res = [0f32;VWIDTH];
+            input.iter().zip(res.iter_mut()).for_each(|(&v, r)| {
+                *r = v.exp();
+            });
+            res
+        })
+    });
+
+    #[cfg(target_arch = "x86_64")]
+    crit.bench_function("exp-base-avx-approx", |b| {
+        let mut it = input_sets.iter().cycle();
+        b.iter(|| {
+            let input = black_box(it.next().unwrap());
+            unsafe {
+                let v_in = _mm256_loadu_ps(input.as_ptr());
+                let v_res = exp_approx_avx::exp_approx_avxf32(v_in);
+                v_res
+            }
+        })
+    });
+
+    // TODO: add ARM + test
+}
+
+fn bench_exponent_slice(crit: &mut Criterion) {
+    let input_length = 250;
+    let num_inputs = 100;
+
+    // build random input sets
+    let mut rnd = rand::thread_rng();
+    let input_sets: Vec<Vec<f32>> = std::iter::repeat_with(|| {
+        std::iter::repeat_with(|| rnd.gen_range(-3.0, 3.0))
+            .take(input_length)
+            .collect()
+    })
+    .take(num_inputs)
+    .collect();
+
+    crit.bench_function("exp-slice-exact", |b| {
+        let mut it = input_sets.iter().cycle();
+        let mut res = vec![0.; input_length];
+        b.iter(|| {
+            let input = black_box(it.next().unwrap());
+            input.iter().zip(res.iter_mut()).for_each(|(&v, r)| {
+                *r = v.exp();
+            });
+            res[0]
+        })
+    });
+
+    crit.bench_function("exp-slice-approx-in-place", |b| {
+        let mut it = input_sets.iter().cycle();
+        let mut res = vec![0.; input_length];
+        b.iter(|| {
+            let input = black_box(it.next().unwrap());
+            res.copy_from_slice(input);
+            exp_approx_slice_in_place(&mut res);
+            res[0]
+        })
+    });
+
+    crit.bench_function("exp-slice-approx", |b| {
+        let mut it = input_sets.iter().cycle();
+        let mut res = vec![0.; input_length];
+        b.iter(|| {
+            let input = black_box(it.next().unwrap());
+            exp_approx_slice(&input, &mut res);
+            res[0]
+        })
+    });
 }
 
 // long form, with samples specified
@@ -216,7 +324,9 @@ criterion_group! {
     config = Criterion::default().sample_size(10);
     targets =
         //example_benchmark,
-        bench_logistic
+        bench_logistic,
+        bench_exponent_native,
+        bench_exponent_slice,
 }
 
 criterion_main!(benches);
