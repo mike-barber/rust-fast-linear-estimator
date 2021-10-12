@@ -8,6 +8,7 @@ use std::arch::x86_64::_mm256_loadu_ps;
 
 use criterion::Criterion;
 use criterion::black_box;
+use fast_linear_estimator::exp_approx::exp_approx_f32;
 use fast_linear_estimator::exp_approx::exp_approx_slice;
 use fast_linear_estimator::exp_approx::exp_approx_slice_in_place;
 use fast_linear_estimator::exp_approx_avx;
@@ -215,7 +216,7 @@ fn bench_logistic(crit: &mut Criterion) {
 }
 
 fn bench_exponent_native(crit: &mut Criterion) {
-    let num_inputs = 100;
+    let num_inputs = 150;
 
     #[cfg(target_arch = "x86_64")]
     const VWIDTH: usize = 8;
@@ -271,8 +272,8 @@ fn bench_exponent_native(crit: &mut Criterion) {
 }
 
 fn bench_exponent_slice(crit: &mut Criterion) {
-    let input_length = 250;
-    let num_inputs = 100;
+    let input_length = 100;
+    let num_inputs = 150;
 
     // build random input sets
     let mut rnd = rand::thread_rng();
@@ -292,9 +293,22 @@ fn bench_exponent_slice(crit: &mut Criterion) {
             input.iter().zip(res.iter_mut()).for_each(|(&v, r)| {
                 *r = v.exp();
             });
-            res[0]
+            black_box(res[0]);
         })
     });
+
+    crit.bench_function("exp-slice-approx-scalar", |b| {
+        let mut it = input_sets.iter().cycle();
+        let mut res = vec![0.; input_length];
+        b.iter(|| {
+            let input = black_box(it.next().unwrap());
+            input.iter().zip(res.iter_mut()).for_each(|(&v, r)| {
+                *r = exp_approx_f32(v);
+            });
+            black_box(res[0]);
+        })
+    });
+
 
     crit.bench_function("exp-slice-approx-in-place", |b| {
         let mut it = input_sets.iter().cycle();
@@ -303,7 +317,7 @@ fn bench_exponent_slice(crit: &mut Criterion) {
             let input = black_box(it.next().unwrap());
             res.copy_from_slice(input);
             exp_approx_slice_in_place(&mut res);
-            res[0]
+            black_box(res[0]);
         })
     });
 
@@ -313,7 +327,7 @@ fn bench_exponent_slice(crit: &mut Criterion) {
         b.iter(|| {
             let input = black_box(it.next().unwrap());
             exp_approx_slice(&input, &mut res);
-            res[0]
+            black_box(res[0]);
         })
     });
 }
