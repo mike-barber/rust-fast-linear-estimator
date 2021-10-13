@@ -1,7 +1,6 @@
-
 use std::slice;
 
-use fast_linear_estimator::exp_approx::exp_approx_slice_in_place;
+use fast_linear_estimator::exp_approx::{exp_approx_slice, exp_approx_slice_in_place};
 #[cfg(target_arch = "aarch64")]
 use fast_linear_estimator::matrix_arm::MatrixF32;
 #[cfg(target_arch = "x86_64")]
@@ -97,6 +96,13 @@ pub extern "C" fn matrix_f32_softmax_cumulative(
 pub extern "C" fn exp_approx_in_place(values: *mut f32, len: usize) {
     let vals = unsafe { slice::from_raw_parts_mut(values, len) };
     exp_approx_slice_in_place(vals);
+}
+
+#[no_mangle]
+pub extern "C" fn exp_approx(src: *const f32, dest: *mut f32, len: usize) {
+    let src = unsafe { slice::from_raw_parts(src, len) };
+    let dest = unsafe { slice::from_raw_parts_mut(dest, len) };
+    exp_approx_slice(src, dest);
 }
 
 #[cfg(test)]
