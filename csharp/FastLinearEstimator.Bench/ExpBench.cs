@@ -10,44 +10,75 @@ namespace FastLinearEstimator.Bench
 
     public class ExpBench
     {
-        private const int _len = 8;
-        private const int _reps = 100;
+        private const int _vectorWords = 8;
+        private const int _arrayLen = 100;
         private const int _numInputSets = 250;
+
+
+        private const int _reps = 100;
         readonly private Random _rng = new Random();
 
-        private float[][] _inputSets;
-        private int _nextInput = 0;
+        private float[][] _inputSetsWords;
+        private float[][] _inputSetArrays;
+        private int _nextInputWord = 0;
+        private int _nextInputArray = 0;
+
+
+        public static void SelfTest()
+        {
+            var bench = new ExpBench();
+            bench.GlobalSetup();
+            bench.ExpAccurateScalar();
+            bench.ExpApproxScalar();
+            bench.ExpAvx();
+            bench.ExpVector();
+            bench.ExpRustInteropWord();
+            bench.ExpApproxArray();
+            bench.ExpRustInteropArray();
+        }
 
 
         [GlobalSetup]
         public void GlobalSetup()
         {
             // setup input sets
-            _inputSets = Enumerable.Range(0, 250).Select(_ =>
+            _inputSetsWords = Enumerable.Range(0, _numInputSets).Select(_ =>
             {
-                var inp = Enumerable.Range(0, _len).Select(_ => (float)_rng.NextDouble() * 10).ToArray();
+                var inp = Enumerable.Range(0, _vectorWords).Select(_ => (float)_rng.NextDouble() * 10).ToArray();
+                return inp;
+            }).ToArray();
+
+            _inputSetArrays = Enumerable.Range(0, _numInputSets).Select(_ =>
+            {
+                var inp = Enumerable.Range(0, _arrayLen).Select(_ => (float)_rng.NextDouble() * 10).ToArray();
                 return inp;
             }).ToArray();
         }
 
-        private float[] GetInput()
+        private float[] GetInputWord()
         {
-            _nextInput = (_nextInput + 1) % _numInputSets;
-            return _inputSets[_nextInput];
+            _nextInputWord = (_nextInputWord + 1) % _numInputSets;
+            return _inputSetsWords[_nextInputWord];
+        }
+
+        private float[] GetInputArray()
+        {
+            _nextInputArray = (_nextInputArray + 1) % _numInputSets;
+            return _inputSetArrays[_nextInputArray];
         }
 
         // Amortised cost of selecting input
-        [Benchmark(OperationsPerInvoke = _len)]
+        [Benchmark(OperationsPerInvoke = _reps)]
         public float BaselineSelect()
         {
-            return GetInput()[0];
+            return GetInputWord()[0];
         }
 
-        [Benchmark(OperationsPerInvoke = _len)]
+        [Benchmark(OperationsPerInvoke = _reps)]
         public float ExpAccurateScalar()
         {
-            var input = GetInput();
-            Span<float> val = input.AsSpan(0, _len);
+            var input = GetInputWord();
+            Span<float> val = input.AsSpan(0, _vectorWords);
             Span<float> res = stackalloc float[input.Length];
 
             for (var r = 0; r < _reps; ++r)
@@ -64,11 +95,11 @@ namespace FastLinearEstimator.Bench
             return res[0];
         }
 
-        [Benchmark(OperationsPerInvoke = _len)]
+        [Benchmark(OperationsPerInvoke = _reps)]
         public float ExpApproxScalar()
         {
-            var input = GetInput();
-            Span<float> val = input.AsSpan(0, _len);
+            var input = GetInputWord();
+            Span<float> val = input.AsSpan(0, _vectorWords);
             Span<float> res = stackalloc float[input.Length];
 
             for (var r = 0; r < _reps; ++r)
@@ -85,10 +116,10 @@ namespace FastLinearEstimator.Bench
             return res[0];
         }
 
-        [Benchmark(OperationsPerInvoke = _len)]
+        [Benchmark(OperationsPerInvoke = _reps)]
         public float ExpAvx()
         {
-            var input = GetInput();
+            var input = GetInputWord();
             unsafe
             {
                 var res = Vector256<float>.Zero;
@@ -105,10 +136,10 @@ namespace FastLinearEstimator.Bench
             }
         }
 
-        [Benchmark(OperationsPerInvoke = _len)]
+        [Benchmark(OperationsPerInvoke = _reps)]
         public float ExpVector()
         {
-            var input = GetInput();
+            var input = GetInputWord();
             var res = Vector<float>.Zero;
             for (var r = 0; r < _reps; ++r)
             {
@@ -119,10 +150,10 @@ namespace FastLinearEstimator.Bench
         }
 
         // not very efficient for short vectors
-        [Benchmark(OperationsPerInvoke = _len)]
-        public float ExpRustInterop()
+        [Benchmark(OperationsPerInvoke = _reps)]
+        public float ExpRustInteropWord()
         {
-            var input = GetInput();
+            var input = GetInputWord();
             Span<float> res = stackalloc float[input.Length];
             for (var r = 0; r < _reps; ++r)
             {
@@ -131,6 +162,57 @@ namespace FastLinearEstimator.Bench
             }
             return res[0];
         }
+
+        [Benchmark]
+        public float ExpApproxArray()
+        {
+            var input = GetInputArray();
+            Span<float> inp = input.AsSpan();
+            Span<float> res = stackalloc float[input.Length];
+
+            // whole words - round to nearest 8
+            var chunkEnd = inp.Length >> 3 << 3;
+            var i = 0;
+            while (i < chunkEnd)
+            {
+                var x = new Vector<float>(inp.Slice(i, 8));
+
+                var y = ExpApprox.ExpApproxVector(x);
+
+                y.CopyTo(res.Slice(i, 8));
+                i += 8;
+            }
+
+            // remainder
+            if (i < inp.Length)
+            {
+                var lenRemaining = inp.Length - i;
+
+                Span<float> temp = stackalloc float[8];
+                inp.Slice(i, lenRemaining).CopyTo(temp);
+                var x = new Vector<float>(temp);
+
+                var y = ExpApprox.ExpApproxVector(x);
+
+                y.CopyTo(temp);
+                temp.Slice(0, lenRemaining).CopyTo(res.Slice(i, lenRemaining));
+            }
+
+            return res[0];
+        }
+
+        [Benchmark]
+        public float ExpRustInteropArray()
+        {
+            var input = GetInputArray();
+            Span<float> res = stackalloc float[input.Length];
+            input.CopyTo(res);
+            RustSafe.ExpApproxInPlace(res);
+            return res[0];
+        }
+
+
+
     }
 
 }

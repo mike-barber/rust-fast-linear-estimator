@@ -11,6 +11,7 @@ namespace FastLinearEstimator.Bench
         {
             // tests
             EstimatorBench.SelfTest();
+            ExpBench.SelfTest();
 
             // benchmarking
             var job = Job.Default

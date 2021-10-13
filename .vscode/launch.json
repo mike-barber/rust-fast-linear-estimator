@@ -8,7 +8,7 @@
             "name": "C# debug benchmark",
             "type": "coreclr",
             "request": "launch",
-            "program": "${workspaceFolder}/csharp/FastLinearEstimator.Bench/bin/Debug/netcoreapp3.1/FastLinearEstimator.Bench.dll",
+            "program": "${workspaceFolder}/csharp/FastLinearEstimator.Bench/bin/Debug/net5.0/FastLinearEstimator.Bench.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
@@ -23,7 +23,7 @@
                 "file dotnet"
             ],
             "processCreateCommands": [
-                "settings set target.run-args ${workspaceFolder}/csharp/FastLinearEstimator.Bench/bin/Debug/netcoreapp3.1/FastLinearEstimator.Bench.dll",
+                "settings set target.run-args ${workspaceFolder}/csharp/FastLinearEstimator.Bench/bin/Debug/net5.0/FastLinearEstimator.Bench.dll",
                 "process launch"
             ],
             "preLaunchTask": "C# build debug"
