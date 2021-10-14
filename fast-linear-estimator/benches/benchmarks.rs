@@ -255,6 +255,18 @@ fn bench_exponent_native(crit: &mut Criterion) {
         })
     });
 
+    crit.bench_function("exp-base-approx-8", |b| {
+        let mut it = input_sets.iter().cycle();
+        b.iter(|| {
+            let input = black_box(it.next().unwrap());
+            let mut res = [0f32;VWIDTH];
+            input.iter().zip(res.iter_mut()).for_each(|(&v, r)| {
+                *r = exp_approx_f32(v);
+            });
+            res
+        })
+    });
+
     #[cfg(target_arch = "x86_64")]
     crit.bench_function("exp-base-avx-approx", |b| {
         let mut it = input_sets.iter().cycle();

@@ -11,7 +11,7 @@ namespace FastLinearEstimator.Bench
     public class ExpBench
     {
         private const int _vectorWords = 8;
-        private const int _arrayLen = 153; // some arbitrary length
+        private const int _arrayLen = 100; // some arbitrary length
         private const int _numInputSets = 250;
 
         readonly private Random _rng = new Random();
@@ -127,14 +127,13 @@ namespace FastLinearEstimator.Bench
             var input = GetInputWord();
             unsafe
             {
-                Span<float> res = _resultScratch.AsSpan(0, _vectorWords);
-                fixed (float* p = input, py = res)
+                fixed (float* p = input, py = _resultScratch)
                 {
                     var vec = Avx.LoadVector256(p);
                     var y = ExpApprox.ExpApproxAvx(vec);
                     Avx.Store(py,y);
                 }
-                return res[0];
+                return _resultScratch[0];
             }
         }
 
@@ -142,11 +141,10 @@ namespace FastLinearEstimator.Bench
         public float ExpVector()
         {
             var input = GetInputWord();
-            Span<float> res = _resultScratch.AsSpan(0, _vectorWords);
             var vec = new Vector<float>(input);
             var y = ExpApprox.ExpApproxVector(vec);
-            y.CopyTo(res);
-            return res[0];
+            y.CopyTo(_resultScratch);
+            return _resultScratch[0];
         }
 
         // not very efficient for short vectors
