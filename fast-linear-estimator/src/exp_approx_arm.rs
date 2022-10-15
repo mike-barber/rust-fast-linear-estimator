@@ -8,7 +8,6 @@ pub fn exp_approx_armf32(x_in: float32x4_t) -> float32x4_t {
     use std::mem::transmute;
 
     unsafe {
-        
         // multiply, clamp and calculate the fractional part
         let mut x = x_in;
         let mut xf: float32x4_t;
@@ -34,12 +33,12 @@ pub fn exp_approx_armf32(x_in: float32x4_t) -> float32x4_t {
         // calculate the approximation
         asm!(
             "dup    {kn:v}.4s,  {c3:w}",                    // kn = c3
-            
+
             "dup    {c:v}.4s,   {c2:w}",
             "fmul   {a:v}.4s,   {xf:v}.4s,  {kn:v}.4s",     // a = xf * kn
             "fadd   {kn:v}.4s,  {a:v}.4s,   {c:v}.4s",      // kn = a + c2
 
-            "dup    {c:v}.4s,   {c1:w}",        
+            "dup    {c:v}.4s,   {c1:w}",
             "fmul   {a:v}.4s,   {xf:v}.4s,  {kn:v}.4s",     // a = xf * kn
             "fadd   {kn:v}.4s,  {a:v}.4s,   {c:v}.4s",      // kn = a + c1
 
@@ -67,7 +66,7 @@ pub fn exp_approx_armf32(x_in: float32x4_t) -> float32x4_t {
             "dup    {Bv:v}.4s,  {B:w}",                     // broadcast B
             "fmul   {x:v}.4s,   {x:v}.4s,   {S:v}.s[0]",    // x = x * S (with first element)
             "fadd   {x:v}.4s,   {x:v}.4s,   {Bv:v}.4s",     // x = x + B
-            
+
             "fcvtzs {xi:v}.4s,  {x:v}.4s",                  // i = x as i32 (convert, not cast)
             S = in(vreg) exp_f32_const::S,                  // scalar within a 4-vector (first element)
             B = in(reg) exp_f32_const::B,
@@ -80,4 +79,3 @@ pub fn exp_approx_armf32(x_in: float32x4_t) -> float32x4_t {
         transmute(xi)
     }
 }
-

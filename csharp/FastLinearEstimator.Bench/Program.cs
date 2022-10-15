@@ -1,4 +1,5 @@
-﻿using BenchmarkDotNet.Configs;
+﻿using System.Reflection;
+using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Running;
 using Perfolizer.Horology;
@@ -7,7 +8,7 @@ namespace FastLinearEstimator.Bench
 {
     class Program
     {
-        static void Main()
+        static void Main(string[] args)
         {
             // tests
             EstimatorBench.SelfTest();
@@ -28,8 +29,9 @@ namespace FastLinearEstimator.Bench
 
             var config = DefaultConfig.Instance.AddJob(job);
 
-            BenchmarkRunner.Run<EstimatorBench>(config);
-            BenchmarkRunner.Run<EstimatorBenchSizeVariations>(config);
+            BenchmarkSwitcher.FromAssembly(Assembly.GetCallingAssembly()).Run(args, config);
+            // BenchmarkRunner.Run<EstimatorBench>(config);
+            // BenchmarkRunner.Run<EstimatorBenchSizeVariations>(config);
         }
     }
 }

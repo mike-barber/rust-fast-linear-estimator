@@ -24,5 +24,11 @@ namespace FastLinearEstimator
         // product => cumulative softmax (approximate) for logistic regression
         [DllImport(LibName, EntryPoint = "matrix_f32_softmax_cumulative", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true, SetLastError = false)]
         internal static extern unsafe bool MatrixF32CumulativeSoftmax(IntPtr avxF32MatrixColumnMajor, float* values, int valuesLength, float* results, int resultsLength);
+
+        [DllImport(LibName, EntryPoint = "matrix_f32_softmax_not_normalised_approx", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true, SetLastError = false)]
+        internal static extern unsafe bool MatrixF32NotNormalisedApprox(IntPtr avxF32MatrixColumnMajor, float* values, int valuesLength, float* results, int resultsLength, float* sum);
+
+        [DllImport(LibName, EntryPoint = "matrix_f32_softmax_not_normalised_sleef", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true, SetLastError = false)]
+        internal static extern unsafe bool MatrixF32NotNormalisedSleef(IntPtr avxF32MatrixColumnMajor, float* values, int valuesLength, float* results, int resultsLength, float* sum);
     }
 }

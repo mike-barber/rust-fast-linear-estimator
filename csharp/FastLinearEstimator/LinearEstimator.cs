@@ -67,6 +67,36 @@ namespace FastLinearEstimator
             }
         }
 
+        public void EstimateSoftMaxNotNormalisedApprox(ReadOnlySpan<float> features, Span<float> results, out float sum)
+        {
+            unsafe
+            {
+                fixed (float* feat = features, res = results, sm = &sum)
+                {
+                    sum = 0;
+                    if (!RustInterop.MatrixF32NotNormalisedApprox(_matrixNative, feat, features.Length, res, results.Length, sm))
+                    {
+                        throw new ArgumentException("Matrix softmax failed. Check dimensions.");
+                    }
+                }
+            }
+        }
+
+        public void EstimateSoftMaxNotNormalisedSleef(ReadOnlySpan<float> features, Span<float> results, out float sum)
+        {
+            unsafe
+            {
+                fixed (float* feat = features, res = results, sm = &sum)
+                {
+                    sum = 0;
+                    if (!RustInterop.MatrixF32NotNormalisedSleef(_matrixNative, feat, features.Length, res, results.Length, sm))
+                    {
+                        throw new ArgumentException("Matrix softmax failed. Check dimensions.");
+                    }
+                }
+            }
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!_disposedValue)

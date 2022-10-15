@@ -1,6 +1,7 @@
 ﻿using BenchmarkDotNet.Attributes;
 using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -11,8 +12,8 @@ namespace FastLinearEstimator.Bench
         private const int _numInputSets = 250;
         readonly private Random _rng = new Random();
 
-        public int NumInputs = 20;
-        public int NumOutputs = 20;
+        public int NumInputs = 15;
+        public int NumOutputs = 75;
 
         private float[][] _inputSets;
         private float[,] _coeff;
@@ -76,9 +77,12 @@ namespace FastLinearEstimator.Bench
             var expectedSoftmax = eb.TestCSharpSoftmax();
 
             // loose tolerance for approximated softmax
+            var toleranceSoftmaxAccurate = new AlmostEqualFloat(1e-6f);
             var toleranceSoftmaxApprox = new AlmostEqualFloat(1e-4f);
-            Check("softmax exact c#   ", expectedSoftmax, eb.TestCSharpSoftmax(), toleranceSoftmaxApprox);
-            Check("softmax rust approx", expectedSoftmax, eb.TestRustSoftmax(), toleranceSoftmaxApprox);
+            Check("softmax exact c#            ", expectedSoftmax, eb.TestCSharpSoftmax(), toleranceSoftmaxAccurate);
+            Check("softmax rust not norm sleef ", expectedSoftmax, eb.TestRustSoftmaxNotNormalisedSleef(), toleranceSoftmaxAccurate);
+            Check("softmax rust not norm approx", expectedSoftmax, eb.TestRustSoftmaxNotNormalisedApprox(), toleranceSoftmaxApprox);
+            Check("softmax rust approx         ", expectedSoftmax, eb.TestRustSoftmax(), toleranceSoftmaxApprox);
 
             // test bench calls -- these will throw if there's anything amiss
             // (a lot easier to diagnose before the benchmark run starts)
@@ -121,6 +125,37 @@ namespace FastLinearEstimator.Bench
             return y;
         }
 
+        private void Cumulative(Span<float> values)
+        {
+            float acc = 0;
+            for (var i = 0; i < values.Length; ++i)
+            {
+                var value = values[i];
+                acc += value;
+                values[i] = acc;
+            }
+        }
+
+        public float[] TestRustSoftmaxNotNormalisedApprox()
+        {
+            var x = _inputSets[0];
+            var y = new float[NumOutputs];
+            RustSoftmaxNotNormalisedApprox(x, y, out var sum);
+            // for consistency in testing
+            Cumulative(y);
+            return y;
+        }
+
+        public float[] TestRustSoftmaxNotNormalisedSleef()
+        {
+            var x = _inputSets[0];
+            var y = new float[NumOutputs];
+            RustSoftmaxNotNormalisedSleef(x, y, out var sum);
+            // for consistency in testing
+            Cumulative(y);
+            return y;
+        }
+
         // simple loop
         public void CSharpProduct(ReadOnlySpan<float> x, Span<float> y)
         {
@@ -158,10 +193,22 @@ namespace FastLinearEstimator.Bench
             }
         }
 
-        // using Rust estimator
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RustSoftmax(ReadOnlySpan<float> x, Span<float> y)
         {
             _linearEstimator.EstimateSoftMaxCumulative(x, y);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RustSoftmaxNotNormalisedSleef(ReadOnlySpan<float> x, Span<float> y, out float sum)
+        {
+            _linearEstimator.EstimateSoftMaxNotNormalisedSleef(x, y, out sum);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RustSoftmaxNotNormalisedApprox(ReadOnlySpan<float> x, Span<float> y, out float sum)
+        {
+            _linearEstimator.EstimateSoftMaxNotNormalisedApprox(x, y, out sum);
         }
 
         private float[] GetRandomInputFloat() => GetRandomInputFloat(_rng);
@@ -191,6 +238,24 @@ namespace FastLinearEstimator.Bench
             var x = GetRandomInputFloat();
             Span<float> y = stackalloc float[NumOutputs];
             RustSoftmax(x, y);
+            return y[0];
+        }
+
+        [Benchmark]
+        public float BenchRustSoftmaxNotNormalisedApprox()
+        {
+            var x = GetRandomInputFloat();
+            Span<float> y = stackalloc float[NumOutputs];
+            RustSoftmaxNotNormalisedApprox(x, y, out var sum);
+            return y[0];
+        }
+
+        [Benchmark]
+        public float BenchRustSoftmaxNotNormalisedSleef()
+        {
+            var x = GetRandomInputFloat();
+            Span<float> y = stackalloc float[NumOutputs];
+            RustSoftmaxNotNormalisedSleef(x, y, out var sum);
             return y[0];
         }
 

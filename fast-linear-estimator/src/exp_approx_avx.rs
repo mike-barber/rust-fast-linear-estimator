@@ -34,4 +34,3 @@ pub fn exp_approx_avxf32(x_in: __m256) -> __m256 {
         res
     }
 }
-

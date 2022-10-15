@@ -1,4 +1,3 @@
-
 use std::slice;
 
 #[cfg(target_arch = "aarch64")]
@@ -86,6 +85,74 @@ pub extern "C" fn matrix_f32_softmax_cumulative(
 
     // perform multiplication
     if let Some(()) = mat.product_softmax_cumulative_approx(vals, res) {
+        true
+    } else {
+        false
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn matrix_f32_softmax_not_normalised_approx(
+    matrix: *mut MatrixF32,
+    values: *const f32,
+    values_length: usize,
+    results: *mut f32,
+    results_length: usize,
+    sum: *mut f32,
+) -> bool {
+    // check for nulls
+    if matrix.is_null() || values.is_null() || results.is_null() {
+        return false;
+    }
+
+    // get ref for return sum
+    let sum = match unsafe { sum.as_mut() } {
+        Some(s) => s,
+        None => return false,
+    };
+
+    // get reference to the matrix, but don't take ownership of it
+    let mat = unsafe { Box::leak(Box::from_raw(matrix)) };
+    // get slices for inputs and outputs
+    let vals = unsafe { slice::from_raw_parts(values, values_length) };
+    let res = unsafe { slice::from_raw_parts_mut(results, results_length) };
+
+    // perform multiplication
+    if let Some(()) = mat.product_softmax_not_normalised_approx(vals, res, sum) {
+        true
+    } else {
+        false
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn matrix_f32_softmax_not_normalised_sleef(
+    matrix: *mut MatrixF32,
+    values: *const f32,
+    values_length: usize,
+    results: *mut f32,
+    results_length: usize,
+    sum: *mut f32,
+) -> bool {
+    // check for nulls
+    if matrix.is_null() || values.is_null() || results.is_null() {
+        return false;
+    }
+
+    // get ref for return sum
+    let sum = match unsafe { sum.as_mut() } {
+        Some(s) => s,
+        None => return false,
+    };
+
+    // get reference to the matrix, but don't take ownership of it
+    let mat = unsafe { Box::leak(Box::from_raw(matrix)) };
+    // get slices for inputs and outputs
+    let vals = unsafe { slice::from_raw_parts(values, values_length) };
+    let res = unsafe { slice::from_raw_parts_mut(results, results_length) };
+
+    // perform multiplication
+    if let Some(()) = mat.product_softmax_not_normalised_sleef(vals, res, sum) {
         true
     } else {
         false

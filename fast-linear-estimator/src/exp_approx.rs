@@ -80,7 +80,7 @@ mod tests {
         let input: __m256 = unsafe { _mm256_loadu_ps(&VALS[0]) };
         let res = crate::exp_approx_avx::exp_approx_avxf32(input);
 
-        let res_f32:[f32;8] = unsafe{ std::mem::transmute(res) };
+        let res_f32: [f32; 8] = unsafe { std::mem::transmute(res) };
         check_assert(&expected(), &res_f32);
     }
 
@@ -92,7 +92,7 @@ mod tests {
         let input: __m256 = unsafe { _mm256_loadu_ps(&VALS[0]) };
         let res = crate::exp_sleef_avx::exp(input);
 
-        let res_f32:[f32;8] = unsafe{ std::mem::transmute(res) };
+        let res_f32: [f32; 8] = unsafe { std::mem::transmute(res) };
         check_assert_accurate(&expected(), &res_f32);
     }
 
