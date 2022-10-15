@@ -183,6 +183,7 @@ impl MatrixF32 {
 
         let mut vector_sum: __m256 = unsafe { _mm256_setzero_ps() };
 
+        // TODO: Exact size chunks first, then remainder.
         destination
             .chunks_mut(SINGLES_PER_INTRINSIC)
             .zip(self.column_intrinsics.iter())

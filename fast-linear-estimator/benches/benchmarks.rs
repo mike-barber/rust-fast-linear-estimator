@@ -111,17 +111,47 @@ fn bench_logistic(crit: &mut Criterion) {
                 output_f32[0]
             })
         });
+
+        // copied to f32 output directly
+        let mut output_f32 = vec![0f32; mat.num_columns];
+        crit.bench_function("matrix-softmax-not-normalised", |b| {
+            b.iter(|| {
+                let input = input_sets.iter().choose(&mut rnd).unwrap();
+
+                let mut sum = 0.0;
+                let some =
+                    mat.product_softmax_not_normalised_approx(&input, &mut output_f32, &mut sum);
+                assert!(some.is_some());
+
+                (output_f32[0], sum)
+            })
+        });
+
+        // copied to f32 output directly, sleef exp
+        let mut output_f32 = vec![0f32; mat.num_columns];
+        crit.bench_function("matrix-softmax-not-normalised-sleef", |b| {
+            b.iter(|| {
+                let input = input_sets.iter().choose(&mut rnd).unwrap();
+
+                let mut sum = 0.0;
+                let some =
+                    mat.product_softmax_not_normalised_sleef(&input, &mut output_f32, &mut sum);
+                assert!(some.is_some());
+
+                (output_f32[0], sum)
+            })
+        });
     }
 
     // directly implemented with iterators
     {
         // directly implemented with iterators
         // note: this is misleadingly fast; it relies on the fact that the dimensions
-        //       are constant, and the compiler takes advantage of this. 
+        //       are constant, and the compiler takes advantage of this.
         //       performance is a lot lower with variable input sizes :)
         //
         //       the MatrixAvxF32 accepts different dimensions. This does not, essentially.
-        // 
+        //
         crit.bench_function("matrix-direct-product (const size)", |b| {
             b.iter(|| {
                 let a = input_sets.iter().choose(&mut rnd).unwrap();
@@ -210,12 +240,10 @@ fn bench_logistic(crit: &mut Criterion) {
                 res.fill(0.0);
                 Zip::from(coeff_nd_transpose.genrows())
                     .and(&a)
-                    .apply(|cf,inp| {
-                        Zip::from(cf)
-                            .and(&mut res)
-                            .apply(|cc,rr| {
-                                *rr = cc * inp;
-                            });
+                    .apply(|cf, inp| {
+                        Zip::from(cf).and(&mut res).apply(|cc, rr| {
+                            *rr = cc * inp;
+                        });
                     });
                 res[0]
             })
