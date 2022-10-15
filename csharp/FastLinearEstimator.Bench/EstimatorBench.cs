@@ -298,8 +298,13 @@ namespace FastLinearEstimator.Bench
 
         [Benchmark]
         public float LargeParallelCSharpSoftmax() => LargeParallel(CSharpSoftmax);
+
         [Benchmark]
         public float LargeParallelRustSoftmax() => LargeParallel(RustSoftmax);
+        [Benchmark]
+        public float LargeParallelRustSoftmaxNotNormalisedSleef() => LargeParallel((x, y) => RustSoftmaxNotNormalisedSleef(x, y, out var _));
+        [Benchmark]
+        public float LargeParallelRustSoftmaxNotNormalisedApprox() => LargeParallel((x, y) => RustSoftmaxNotNormalisedApprox(x, y, out var _));
 
     }
 }
