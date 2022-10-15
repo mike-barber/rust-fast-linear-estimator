@@ -183,29 +183,48 @@ impl MatrixF32 {
 
         let mut vector_sum: __m256 = unsafe { _mm256_setzero_ps() };
 
-        // TODO: Exact size chunks first, then remainder.
-        destination
-            .chunks_mut(SINGLES_PER_INTRINSIC)
-            .zip(self.column_intrinsics.iter())
-            .zip(self.intercept_intrinsics.iter())
-            .for_each(|((dst, col), intercepts)| {
-                // run multiplication and add to `accumulate`, starting with the intercepts
-                let mut accumulate = *intercepts;
-                for (val, row_intrin) in values.iter().zip(col) {
-                    Self::multiply_add(&mut accumulate, *row_intrin, *val);
-                }
+        let mut iter_coeffs = std::iter::zip(&self.column_intrinsics, &self.intercept_intrinsics);
 
-                // copy to destination (taking into account final shorter stub)
-                // 1. approximate exponential
-                accumulate = exp_fn(accumulate);
-                // 2. accumulate and copy
-                vector_sum = unsafe { _mm256_add_ps(vector_sum, accumulate) };
-                unsafe {
-                    let store_mask = Self::STORE_MASKS.get_unchecked(dst.len() - 1);
-                    let mask = std::mem::transmute(*store_mask);
-                    _mm256_maskstore_ps(dst.as_mut_ptr(), mask, accumulate)
-                }
-            });
+        // full size chunks
+        let mut dest_chunks = destination.chunks_exact_mut(SINGLES_PER_INTRINSIC);
+        for (dst, (col, intercepts)) in (&mut dest_chunks).zip(&mut iter_coeffs) {
+            // run multiplication and add to `accumulate`, starting with the intercepts
+            let mut accumulate = *intercepts;
+            for (val, row_intrin) in values.iter().zip(col) {
+                Self::multiply_add(&mut accumulate, *row_intrin, *val);
+            }
+
+            // 1. approximate exponential
+            accumulate = exp_fn(accumulate);
+
+            // 2. accumulate and copy
+            vector_sum = unsafe { _mm256_add_ps(vector_sum, accumulate) };
+            unsafe {
+                _mm256_storeu_ps(dst.as_mut_ptr(), accumulate);
+            }
+        }
+
+        // final chunk
+        let dst = dest_chunks.into_remainder();
+        {
+            let (col, intercepts) = iter_coeffs.next().unwrap();
+            // run multiplication and add to `accumulate`, starting with the intercepts
+            let mut accumulate = *intercepts;
+            for (val, row_intrin) in values.iter().zip(col) {
+                Self::multiply_add(&mut accumulate, *row_intrin, *val);
+            }
+
+            // 1. approximate exponential
+            accumulate = exp_fn(accumulate);
+
+            // 2. accumulate and copy
+            vector_sum = unsafe { _mm256_add_ps(vector_sum, accumulate) };
+            unsafe {
+                let store_mask = Self::STORE_MASKS.get_unchecked(dst.len() - 1);
+                let mask = std::mem::transmute(*store_mask);
+                _mm256_maskstore_ps(dst.as_mut_ptr(), mask, accumulate)
+            }
+        }
 
         // horizontal sum on final vector sum
         unsafe {
