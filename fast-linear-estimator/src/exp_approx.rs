@@ -59,6 +59,12 @@ mod tests {
         });
     }
 
+    fn check_assert_accurate(expect: &[f32], vals: &[f32]) {
+        vals.iter().zip(expect.iter()).for_each(|(act, exp)| {
+            assert_relative_eq!(exp, act, max_relative = 1e-8);
+        });
+    }
+
     #[test]
     fn exp_approx_f32() {
         let res: Vec<_> = VALS.iter().map(|&v| super::exp_approx_f32(v)).collect();
@@ -76,6 +82,18 @@ mod tests {
 
         let res_f32:[f32;8] = unsafe{ std::mem::transmute(res) };
         check_assert(&expected(), &res_f32);
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn exp_sleef_avx() {
+        use std::arch::x86_64::*;
+
+        let input: __m256 = unsafe { _mm256_loadu_ps(&VALS[0]) };
+        let res = crate::exp_sleef_avx::exp(input);
+
+        let res_f32:[f32;8] = unsafe{ std::mem::transmute(res) };
+        check_assert_accurate(&expected(), &res_f32);
     }
 
     #[cfg(target_arch = "aarch64")]

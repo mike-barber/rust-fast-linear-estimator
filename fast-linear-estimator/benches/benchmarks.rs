@@ -98,6 +98,19 @@ fn bench_logistic(crit: &mut Criterion) {
                 output_f32[0]
             })
         });
+
+        // copied to f32 output directly, sleef exp
+        let mut output_f32 = vec![0f32; mat.num_columns];
+        crit.bench_function("matrix-softmax-sleef", |b| {
+            b.iter(|| {
+                let input = input_sets.iter().choose(&mut rnd).unwrap();
+
+                let some = mat.product_softmax_cumulative_sleef(&input, &mut output_f32);
+                assert!(some.is_some());
+
+                output_f32[0]
+            })
+        });
     }
 
     // directly implemented with iterators

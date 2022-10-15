@@ -100,11 +100,15 @@ impl MatrixF32 {
         Some(())
     }
 
-    pub fn product_softmax_cumulative_approx(
+    fn product_softmax_cumulative<F>(
         &self,
         values: &[f32],
         destination: &mut [f32],
-    ) -> Option<()> {
+        exp_fn: F,
+    ) -> Option<()>
+    where
+        F: Fn(__m256) -> __m256,
+    {
         if destination.len() != self.num_columns || values.len() != self.num_rows {
             return None;
         }
@@ -124,7 +128,7 @@ impl MatrixF32 {
 
                 // copy to destination (taking into account final shorter stub) and apply cumulative softmax
                 // 1. approximate exponential
-                accumulate = crate::exp_approx_avx::exp_approx_avxf32(accumulate);
+                accumulate = exp_fn(accumulate);
                 // 2. accumulate and copy
                 let src: &[f32; SINGLES_PER_INTRINSIC] = unsafe { transmute(&accumulate) };
                 dst.iter_mut().zip(src).for_each(|(d, s)| {
@@ -134,5 +138,25 @@ impl MatrixF32 {
             });
 
         Some(())
+    }
+
+    pub fn product_softmax_cumulative_approx(
+        &self,
+        values: &[f32],
+        destination: &mut [f32],
+    ) -> Option<()> {
+        self.product_softmax_cumulative(
+            values,
+            destination,
+            crate::exp_approx_avx::exp_approx_avxf32,
+        )
+    }
+
+    pub fn product_softmax_cumulative_sleef(
+        &self,
+        values: &[f32],
+        destination: &mut [f32],
+    ) -> Option<()> {
+        self.product_softmax_cumulative(values, destination, crate::exp_sleef_avx::exp)
     }
 }
