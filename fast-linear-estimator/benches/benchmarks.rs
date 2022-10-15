@@ -122,7 +122,7 @@ fn bench_logistic(crit: &mut Criterion) {
         //
         //       the MatrixAvxF32 accepts different dimensions. This does not, essentially.
         // 
-        crit.bench_function("matrix-direct-product", |b| {
+        crit.bench_function("matrix-direct-product (const size)", |b| {
             b.iter(|| {
                 let a = input_sets.iter().choose(&mut rnd).unwrap();
                 let mut r = [0.0; NUM_OUTPUT];
@@ -139,7 +139,7 @@ fn bench_logistic(crit: &mut Criterion) {
             })
         });
 
-        crit.bench_function("matrix-direct-softmax", |b| {
+        crit.bench_function("matrix-direct-softmax (const size)", |b| {
             b.iter(|| {
                 let input_index = rnd.gen_range(0, NUM_INPUT_SETS);
                 let a = &(input_sets[input_index]);
