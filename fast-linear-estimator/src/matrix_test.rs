@@ -3,6 +3,7 @@
 mod tests {
 
     use approx::abs_diff_eq;
+    use approx::assert_abs_diff_eq;
 
     #[cfg(target_arch = "x86_64")]
     use crate::matrix_avx::MatrixF32;
@@ -89,6 +90,8 @@ mod tests {
         let intercepts = [0.1f32, 0.2f32, 0.3f32];
         let matrix = MatrixF32::create_from_rows(&rows, &intercepts).unwrap();
         let v = vec![0.1f32, 0.5f32];
+        
+        // approx
         let mut res = vec![0f32; 3];
         matrix.product_softmax_cumulative_approx(&v, &mut res);
 
@@ -97,6 +100,64 @@ mod tests {
             .iter()
             .zip(&[9.025013_f32, 27.199159_f32, 63.797393_f32])
             .all(|(a, b)| abs_diff_eq!(a, b, epsilon = 0.01f32));
+        assert!(ok);
+
+        // sleef
+        let mut res = vec![0f32; 3];
+        matrix.product_softmax_cumulative_sleef(&v, &mut res);
+
+        // check approximately equal (with faily large tolerance since the numbers are large)
+        let ok = res
+            .iter()
+            .zip(&[9.025013_f32, 27.199159_f32, 63.797393_f32])
+            .all(|(a, b)| abs_diff_eq!(a, b, epsilon = 0.01f32));
+        assert!(ok);
+    }
+
+    #[test]
+    fn product_softmax_not_normalised() {
+        // in R,
+        //      > coeff = t(matrix(1:6, ncol=2))
+        //      > intercept = c(0.1, 0.2, 0.3)
+        //      > x = c(0.1, 0.5)
+        //      > logit = x %*% coeff + intercept
+        //      > exp(logit)
+        //      [1,] 9.025013 18.17415 36.59823
+        //      > sum(exp(logit))
+        //      [1] 63.79739
+        //
+        let rows = vec![vec![1.0f32, 2.0, 3.0], vec![4.0f32, 5.0, 6.0]];
+        let intercepts = [0.1f32, 0.2f32, 0.3f32];
+        let matrix = MatrixF32::create_from_rows(&rows, &intercepts).unwrap();
+        let v = vec![0.1f32, 0.5f32];
+        
+        let expected = vec![9.025013, 18.17415, 36.59823];
+        let expected_sum =  63.79739;
+        
+        // approx
+        let mut res = vec![0f32; 3];
+        let mut sum = 0.0;
+        matrix.product_softmax_not_normalised_approx(&v, &mut res, &mut sum);
+
+        // check approximately equal (with faily large tolerance since the numbers are large)
+        assert_abs_diff_eq!(expected_sum, sum, epsilon = 0.01_f32);
+        let ok = res
+            .iter()
+            .zip(&expected)
+            .all(|(a, b)| abs_diff_eq!(a, b, epsilon = 0.01_f32));
+        assert!(ok);
+
+        // sleef
+        let mut res = vec![0f32; 3];
+        let mut sum = 0.0;
+        matrix.product_softmax_not_normalised_sleef(&v, &mut res, &mut sum);
+
+        // check approximately equal (with faily large tolerance since the numbers are large)
+        assert_abs_diff_eq!(expected_sum, sum, epsilon = 0.01_f32);
+        let ok = res
+            .iter()
+            .zip(&expected)
+            .all(|(a, b)| abs_diff_eq!(a, b, epsilon = 0.01_f32));
         assert!(ok);
     }
 }

@@ -18,6 +18,11 @@ pub fn zeros() -> __m256 {
     unsafe { std::mem::transmute([0f32; SINGLES_PER_INTRINSIC]) }
 }
 
+// value for inter
+pub fn exp_base_resulting_in_zero() -> __m256 {
+    unsafe { _mm256_set1_ps(-1000.0) }
+}
+
 impl MatrixF32 {
     pub fn create_from_rows(rows: &Vec<Vec<f32>>, intercepts: &[f32]) -> Option<Self> {
         let num_columns = rows.first()?.len();
@@ -36,7 +41,9 @@ impl MatrixF32 {
             num_col_instrinsics,
             num_rows: rows.len(),
             column_intrinsics: vec![],
-            intercept_intrinsics: vec![zeros(); num_col_instrinsics],
+            // set strongly negative intercepts for uninitialised elements, such
+            // that the softmax will set these to zero.
+            intercept_intrinsics: vec![exp_base_resulting_in_zero(); num_col_instrinsics],
         };
 
         // copy intercepts
@@ -159,4 +166,93 @@ impl MatrixF32 {
     ) -> Option<()> {
         self.product_softmax_cumulative(values, destination, crate::exp_sleef_avx::exp)
     }
+
+    fn product_softmax_not_normalised<F>(
+        &self,
+        values: &[f32],
+        destination: &mut [f32],
+        sum: &mut f32,
+        exp_fn: F,
+    ) -> Option<()>
+    where
+        F: Fn(__m256) -> __m256,
+    {
+        if destination.len() != self.num_columns || values.len() != self.num_rows {
+            return None;
+        }
+
+        let mut vector_sum: __m256 = unsafe { _mm256_setzero_ps() };
+
+        destination
+            .chunks_mut(SINGLES_PER_INTRINSIC)
+            .zip(self.column_intrinsics.iter())
+            .zip(self.intercept_intrinsics.iter())
+            .for_each(|((dst, col), intercepts)| {
+                // run multiplication and add to `accumulate`, starting with the intercepts
+                let mut accumulate = *intercepts;
+                for (val, row_intrin) in values.iter().zip(col) {
+                    Self::multiply_add(&mut accumulate, *row_intrin, *val);
+                }
+
+                // copy to destination (taking into account final shorter stub)
+                // 1. approximate exponential
+                accumulate = exp_fn(accumulate);
+                // 2. accumulate and copy
+                vector_sum = unsafe { _mm256_add_ps(vector_sum, accumulate) };
+                unsafe {
+                    let store_mask = Self::STORE_MASKS.get_unchecked(dst.len() - 1);
+                    let mask = std::mem::transmute(*store_mask);
+                    _mm256_maskstore_ps(dst.as_mut_ptr(), mask, accumulate)
+                }
+            });
+
+        // horizontal sum on final vector sum
+        unsafe {
+            // in lanes
+            vector_sum = _mm256_hadd_ps(vector_sum, vector_sum);
+            vector_sum = _mm256_hadd_ps(vector_sum, vector_sum);
+            // extract left and right and add
+            let vs_0 = _mm256_extractf128_ps::<0>(vector_sum);
+            let vs_1 = _mm256_extractf128_ps::<1>(vector_sum);
+            let vs_sum = _mm_add_ss(vs_0, vs_1);
+            *sum = _mm_cvtss_f32(vs_sum);
+        }
+
+        Some(())
+    }
+
+    pub fn product_softmax_not_normalised_approx(
+        &self,
+        values: &[f32],
+        destination: &mut [f32],
+        sum: &mut f32,
+    ) -> Option<()> {
+        self.product_softmax_not_normalised(
+            values,
+            destination,
+            sum,
+            crate::exp_approx_avx::exp_approx_avxf32,
+        )
+    }
+
+    pub fn product_softmax_not_normalised_sleef(
+        &self,
+        values: &[f32],
+        destination: &mut [f32],
+        sum: &mut f32,
+    ) -> Option<()> {
+        self.product_softmax_not_normalised(values, destination, sum, crate::exp_sleef_avx::exp)
+    }
+
+    // masks for AVX maskstore operations; the MSB is used for the mask.
+    const STORE_MASKS: [[i32; 8]; 8] = [
+        [-1, 0, 0, 0, 0, 0, 0, 0],
+        [-1, -1, 0, 0, 0, 0, 0, 0],
+        [-1, -1, -1, 0, 0, 0, 0, 0],
+        [-1, -1, -1, -1, 0, 0, 0, 0],
+        [-1, -1, -1, -1, -1, 0, 0, 0],
+        [-1, -1, -1, -1, -1, -1, 0, 0],
+        [-1, -1, -1, -1, -1, -1, -1, 0],
+        [-1, -1, -1, -1, -1, -1, -1, -1],
+    ];
 }

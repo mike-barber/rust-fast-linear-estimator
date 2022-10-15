@@ -16,8 +16,8 @@ use fast_linear_estimator::matrix_avx::MatrixF32;
 use fast_linear_estimator::matrix_arm::MatrixF32;
 
 // sizes
-const NUM_INPUT: usize = 20;
-const NUM_OUTPUT: usize = 20;
+const NUM_INPUT: usize = 15;
+const NUM_OUTPUT: usize = 75;
 const NUM_INPUT_SETS: usize = 250;
 
 fn bench_logistic(crit: &mut Criterion) {
