@@ -23,8 +23,9 @@ const NUM_INPUT_SETS: usize = 250;
 fn bench_logistic(crit: &mut Criterion) {
     // build random input sets
     let mut rnd = rand::thread_rng();
+
     let input_sets: Vec<Vec<f32>> = std::iter::repeat_with(|| {
-        std::iter::repeat_with(|| rnd.gen_range(-5.0 * 0.5, 5.0 * 0.5))
+        std::iter::repeat_with(|| rnd.gen_range((-5.0f32 * 0.5)..(5.0f32 * 0.5)))
             .take(NUM_INPUT)
             .collect()
     })
@@ -45,7 +46,7 @@ fn bench_logistic(crit: &mut Criterion) {
     let mut coeff_nd_transpose = Array2::<f32>::zeros((NUM_INPUT, NUM_OUTPUT));
     for ip in 0..NUM_INPUT {
         for op in 0..NUM_OUTPUT {
-            let v = rnd.gen_range(coeff_min, coeff_max);
+            let v = rnd.gen_range(coeff_min..coeff_max);
             // normal arrays
             coeff[op][ip] = v;
             coeff_transpose[ip][op] = v;
@@ -57,7 +58,7 @@ fn bench_logistic(crit: &mut Criterion) {
 
     let mut intercepts = [0f32; NUM_OUTPUT];
     for op in 0..NUM_OUTPUT {
-        let v = rnd.gen_range(intercept_min, intercept_max);
+        let v = rnd.gen_range(intercept_min..intercept_max);
         intercepts[op] = v;
     }
 
@@ -171,7 +172,7 @@ fn bench_logistic(crit: &mut Criterion) {
 
         crit.bench_function("matrix-direct-softmax (const size)", |b| {
             b.iter(|| {
-                let input_index = rnd.gen_range(0, NUM_INPUT_SETS);
+                let input_index = rnd.gen_range(0..NUM_INPUT_SETS);
                 let a = &(input_sets[input_index]);
 
                 let mut r = [0.0; NUM_OUTPUT];
@@ -238,10 +239,10 @@ fn bench_logistic(crit: &mut Criterion) {
                 let input = input_sets.iter().choose(&mut rnd).unwrap();
                 let a = ArrayView1::from(input);
                 res.fill(0.0);
-                Zip::from(coeff_nd_transpose.genrows())
+                Zip::from(coeff_nd_transpose.rows())
                     .and(&a)
-                    .apply(|cf, inp| {
-                        Zip::from(cf).and(&mut res).apply(|cc, rr| {
+                    .for_each(|cf, inp| {
+                        Zip::from(cf).and(&mut res).for_each(|cc, rr| {
                             *rr = cc * inp;
                         });
                     });

@@ -2,21 +2,21 @@
 name = "fast-linear-estimator"
 version = "0.1.0"
 authors = ["Michael Barber <60610888+mike-barber@users.noreply.github.com>"]
-edition = "2018"
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 
 [dev-dependencies]
-criterion = "0.3"
-rand = "0.7"
-rayon = "1.3"
-approx = "0.3"
-ndarray = "0.13"
+criterion = "0.4"
+rand = "0.8.5"
+rayon = "1.5"
+approx = "0.5"
+ndarray = "0.15"
 
 [build-dependencies]
-rustc_version = "0.2"
+rustc_version = "0.4"
 
 [features]
 default = []
